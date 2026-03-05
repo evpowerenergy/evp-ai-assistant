@@ -1,0 +1,50 @@
+# FastAPI Core
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# Supabase
+# Note: supabase 2.3.0 requires httpx<0.25.0, so we let it manage httpx version
+# Let supabase manage postgrest version to avoid conflicts
+supabase==2.3.0
+# postgrest version is managed by supabase package
+
+# AI/ML
+langchain==0.1.6
+langchain-openai==0.0.2
+langgraph==0.0.20
+openai==1.12.0
+
+# Vector Database
+pgvector==0.2.4
+
+# LINE (Phase 4 - Commented out until Python 3.12 compatibility)
+# line-bot-sdk 3.5.0 requires aiohttp==3.8.5 which doesn't support Python 3.12
+# Uncomment when ready for Phase 4 or use Python 3.11
+# line-bot-sdk==3.5.0
+
+# Authentication & Security
+pyjwt==2.8.0
+cryptography==42.0.5
+
+# HTTP Client
+# Note: Removed explicit httpx version - supabase will manage it
+# supabase 2.3.0 requires: httpx>=0.24.0,<0.25.0
+# Note: aiohttp version managed by langchain and other dependencies
+# langchain requires: aiohttp>=3.8.3,<4.0.0
+
+# Utilities
+python-dotenv==1.0.0
+
+# Dependency Constraints
+# Fix conflict: langchain-core requires packaging<24.0, but supabase may install 25.0
+packaging>=23.2,<24.0
+
+# Logging
+structlog==24.1.0
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3

@@ -1,0 +1,72 @@
+# Dependencies
+node_modules/
+venv/
+env/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Testing
+.coverage
+.pytest_cache/
+.nyc_output/
+coverage/
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# TypeScript
+*.tsbuildinfo
+
+# Cloud Run
+.gcloudignore
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.cert
