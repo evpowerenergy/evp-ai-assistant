@@ -126,6 +126,10 @@ TOOL_SCHEMAS = [
                         "type": "string",
                         "description": "End date in YYYY-MM-DD format (e.g., '2026-01-16' for yesterday, or '2026-01-17' for today if query is 'this week'). Extract from query if user mentions date ranges.",
                         "format": "date"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "description": "Optional. Filter by platform. Set from current message OR from previous conversation (PLATFORM RULE). If not specified and no context → omit (all platforms). Values: Huawei, ATMOCE, Solar Edge, Sigenergy, Facebook, Line, etc."
                     }
                 },
                 "required": ["query"]
@@ -136,7 +140,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "get_sales_closed",
-            "description": "Sales Closed report (SUCCESSFULLY closed only). ตัวเลขยึดตามหน้า /reports/sales-closed. นับตาม lead_productivity_logs. ✅ Use for: 'เดือนที่แล้วปิดการขายได้กี่ราย', 'ปิดการขายได้กี่ราย', 'ขอยอดขาย', 'ยอดขายที่ปิดแล้ว', 'ยอดตามแพลตฟอร์ม', 'แยก Package/Wholesales'. Returns salesCount + totalSalesValue. ⚠️ Do NOT use for 'ปิดการขายไม่ได้กี่ราย' — use get_sales_unsuccessful instead. เมื่อถามช่วงหลายเดือน: ส่ง date_from/date_to ครั้งเดียว.",
+            "description": "Sales Closed report (SUCCESSFULLY closed only). ตัวเลขยึดตามหน้า /reports/sales-closed. ✅ Use for: 'ปิดการขายได้กี่ราย', 'ยอดขายที่ปิดแล้ว', 'ยอดตามแพลตฟอร์ม', 'ลีด Huawei ปิดได้กี่ราย'. เมื่อผู้ใช้ระบุแพลตฟอร์มหรือจากบทสนทนาก่อนหน้า → ส่ง platform. ไม่ระบุและไม่มีบริบท = ทุกแพลตฟอร์ม (ไม่ส่ง platform). เมื่อถามช่วงหลายเดือน: ส่ง date_from/date_to ครั้งเดียว.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -153,6 +157,10 @@ TOOL_SCHEMAS = [
                     "sales_member_id": {
                         "type": "integer",
                         "description": "Optional sales member id to filter by who closed the sale (sale_id in lead_productivity_logs)"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "description": "Optional. Filter by platform. Set from current message OR from previous conversation (e.g. user previously asked about Huawei → follow-up 'ยอดปิดได้กี่ราย' = same platform). If not specified and no context → omit (all platforms). Values: Huawei, ATMOCE, Solar Edge, Sigenergy, Facebook, Line, etc."
                     }
                 },
                 "required": []
@@ -163,7 +171,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "get_sales_unsuccessful",
-            "description": "Sales Unsuccessful report (ปิดการขายไม่สำเร็จ). ตัวเลขตรงกับหน้า /reports/sales-unsuccessful. นับจาก lead_productivity_logs ที่ status='ปิดการขายไม่สำเร็จ' (วันที่ log.created_at_thai ไม่ใช่วันที่ lead). ✅ Use for: 'เดือนที่แล้วปิดการขายไม่ได้กี่ราย', 'ปิดการขายไม่ได้กี่ราย', 'ปิดไม่สำเร็จกี่ราย'. Returns unsuccessfulCount + totalQuotationValue + unsuccessfulLeads. ⚠️ Do NOT use search_leads for this — get_sales_unsuccessful gives correct count matching the report page. ต้องส่ง date_from/date_to เมื่อผู้ใช้ระบุช่วงเวลา.",
+            "description": "Sales Unsuccessful report (ปิดการขายไม่สำเร็จ). ตัวเลขตรงกับหน้า /reports/sales-unsuccessful. ✅ Use for: 'ปิดการขายไม่ได้กี่ราย', 'ลีด Huawei ปิดการขายไม่ได้กี่ราย'. ส่ง platform จากข้อความปัจจุบัน หรือจากบทสนทนาก่อนหน้า (เช่น เคยถามลีด Huawei แล้วถามตาม 'แล้วปิดไม่ได้กี่ราย' = ใช้ Huawei). ไม่ระบุและไม่มีบริบท = ทุกแพลตฟอร์ม (ไม่ส่ง platform). ต้องส่ง date_from/date_to เมื่อผู้ใช้ระบุช่วงเวลา.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -180,6 +188,10 @@ TOOL_SCHEMAS = [
                     "sales_member_id": {
                         "type": "integer",
                         "description": "Optional sales member id to filter by"
+                    },
+                    "platform": {
+                        "type": "string",
+                        "description": "Optional. Filter by platform. Set from current message OR from previous conversation. If not specified and no context → omit (all platforms). Values: Huawei, ATMOCE, Solar Edge, Sigenergy, Facebook, Line, etc."
                     }
                 },
                 "required": []
@@ -597,7 +609,7 @@ Available tools (ALWAYS use function calling for data queries):
    ⚠️ Do NOT use for "เดือนที่แล้วปิดการขายไม่ได้กี่ราย" / "ปิดการขายไม่ได้กี่ราย" — use get_sales_unsuccessful instead (ตัวเลขตรงหน้า /reports/sales-unsuccessful).
    ⚠️ Do NOT use for "ปิดการขายได้กี่ราย" — use get_sales_closed instead.
    ⚠️ STATUS RULE: When user does NOT ask for ONE specific status ("ขอข้อมูลลีดวันนี้", "ลีดวันนี้"), omit status. Only set status when user EXPLICITLY asks one status ("ลีดที่รอรับวันนี้", "closed leads").
-   Examples: "ขอข้อมูลลีดวันนี้" → search_leads with query="today", no status. "เดือนที่แล้วปิดการขายไม่ได้กี่ราย" → get_sales_unsuccessful with date_from/date_to=last month.
+   Examples: "ขอข้อมูลลีดวันนี้" → search_leads with query="today", no status. "เดือนที่แล้วปิดการขายไม่ได้กี่ราย" → get_sales_unsuccessful with date_from/date_to=last month. "ลีด huawei ปิดการขายไม่ได้กี่ราย" / "ลีด Huawei ย้อนหลัง 30 วัน ปิดไม่ได้กี่ราย" → get_sales_unsuccessful with date_from/date_to and platform="Huawei".
 
 2. get_lead_status - For finding ONE SPECIFIC lead by name (like phone validation lookup)
    Use when: User asks about a SPECIFIC lead by name (e.g., "สถานะของลีดชื่อ John Doe", "ลีดชื่อ สมชาย")
@@ -679,12 +691,17 @@ Available tools (ALWAYS use function calling for data queries):
 - get_inventory_status - Inventory status (inventory)
 - get_customer_info - Customer info (inventory customer - NOT the sales customer info)
 
+=== PLATFORM RULE (ใช้กับ get_sales_unsuccessful, get_sales_closed, search_leads) ===
+- **พิจารณา platform เสมอ:** จาก (1) ข้อความปัจจุบัน (เช่น "ลีด Huawei ปิดไม่ได้กี่ราย") หรือ (2) บทสนทนาก่อนหน้า (เช่น ผู้ใช้เพิ่งถามเรื่องลีด Huawei แล้วถามตาม "แล้วปิดไม่ได้กี่ราย" = ใช้ platform เดิม).
+- **ถ้าผู้ใช้ไม่ระบุและไม่มีบริบทจากบทสนทนาก่อนหน้า** = ทุกแพลตฟอร์ม → ไม่ต้องส่ง platform (omit).
+- เมื่อมีบริบทแพลตฟอร์มชัด → ส่ง platform ให้ตรงกับนั้น (e.g. Huawei, ATMOCE) เพื่อให้ตัวเลขตรงหน้ารายงานที่กรองแพลตฟอร์ม.
+
 === IMPORTANT TOOL SELECTION RULES ===
 ✅ "ลูกค้าใหม่กี่ราย" / "เดือนที่แล้วมีลูกค้าใหม่กี่ราย" / "ลีดใหม่กี่ราย" (รายที่เข้ามาใหม่ในช่วง) → search_leads with date_from/date_to. Do NOT use get_sales_closed.
-✅ "ปิดการขายได้กี่ราย" / "เดือนที่แล้วปิดการขายได้กี่ราย" (SUCCESS) → get_sales_closed with date_from/date_to. Do NOT use search_leads.
-✅ "ปิดการขายไม่ได้กี่ราย" / "เดือนที่แล้วปิดการขายไม่ได้กี่ราย" (FAILED) → get_sales_unsuccessful with date_from/date_to. Do NOT use search_leads or get_sales_closed (ตัวเลขตรงหน้า /reports/sales-unsuccessful).
-✅ Use get_sales_closed for: ยอดขายที่ปิด, ขอยอดขาย, ยอดตามแพลตฟอร์ม, แยก Package/Wholesales, เดือนที่แล้วปิดการขายได้กี่ราย, ปิดการขายได้กี่ราย (with period)
-✅ Use search_leads for: listing leads, dashboard by status (รอรับ/กำลังติดตาม/ปิดการขาย), "ขอข้อมูลลีดวันนี้", "ลีดวันนี้มีกี่ราย" (all statuses). When user does NOT specify one status, omit status — get all leads; answer will break down by status
+✅ "ปิดการขายได้กี่ราย" / "เดือนที่แล้วปิดการขายได้กี่ราย" (SUCCESS) → get_sales_closed with date_from/date_to. Apply PLATFORM RULE (from message or conversation context).
+✅ "ปิดการขายไม่ได้กี่ราย" / "เดือนที่แล้วปิดการขายไม่ได้กี่ราย" (FAILED) → get_sales_unsuccessful with date_from/date_to. Apply PLATFORM RULE (from message or conversation context).
+✅ Use get_sales_closed for: ยอดขายที่ปิด, ขอยอดขาย, ยอดตามแพลตฟอร์ม, แยก Package/Wholesales, ปิดการขายได้กี่ราย (with period + platform when relevant)
+✅ Use search_leads for: listing leads, dashboard by status, "ขอข้อมูลลีดวันนี้", "ลีดวันนี้มีกี่ราย". Apply PLATFORM RULE when user or context specifies a platform (e.g. "ลีด Huawei วันนี้" → query + platform)
 ✅ Only set search_leads status when user EXPLICITLY asks one status ("ลีดที่รอรับวันนี้", "closed leads")
 ✅ search_leads returns FULL lead data - LLM can calculate counts, group by status/platform/category
 ✅ Use get_lead_status ONLY when user mentions a SPECIFIC lead name

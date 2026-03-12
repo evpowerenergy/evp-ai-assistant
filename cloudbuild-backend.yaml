@@ -1,0 +1,18 @@
+# Cloud Build สำหรับ AI Assistant Backend (รูปแบบเดียวกับ CRM — config อยู่ที่ root, ส่ง source เป็น .)
+# รัน: gcloud builds submit --config=cloudbuild-backend.yaml --substitutions=_IMAGE=...
+
+substitutions:
+  _IMAGE: ''
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'backend/Dockerfile'
+      - '-t'
+      - '${_IMAGE}'
+      - 'backend'
+
+images:
+  - '${_IMAGE}'

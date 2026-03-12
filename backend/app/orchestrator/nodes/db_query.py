@@ -85,26 +85,25 @@ async def db_query_node(state: AIAssistantState) -> AIAssistantState:
                     elif tool_name == "search_leads":
                         query = params.get("query", user_message)
                         # IMPORTANT: Keep query as dict if it's a dict (don't convert to string)
-                        # search_leads can handle both dict and string, and needs dict to extract platform/brand
-                        # Only convert to string if it's not already a dict
                         if not isinstance(query, dict):
                             query = str(query) if query is not None else str(user_message)
-                        
                         date_from = params.get("date_from")
                         date_to = params.get("date_to")
-                        status = params.get("status")  # Get status from LLM parameters
+                        status = params.get("status")
+                        platform = params.get("platform")  # PLATFORM RULE: from message or conversation context
                         result = await search_leads(
-                            query=query,  # Can be dict or string
+                            query=query,
                             user_id=user_id,
                             filters=None,
                             user_role=user_role,
                             date_from=date_from,
                             date_to=date_to,
-                            status=status  # Pass status to search_leads
+                            status=status,
+                            platform=platform,
                         )
                         tool_results.append({
                             "tool": "search_leads",
-                            "input": {"query": query, "status": status, "date_from": date_from, "date_to": date_to},
+                            "input": {"query": query, "status": status, "date_from": date_from, "date_to": date_to, "platform": platform},
                             "output": result
                         })
 
@@ -112,16 +111,18 @@ async def db_query_node(state: AIAssistantState) -> AIAssistantState:
                         date_from = params.get("date_from")
                         date_to = params.get("date_to")
                         sales_member_id = params.get("sales_member_id")
+                        platform = params.get("platform")
                         result = await get_sales_closed(
                             user_id=user_id,
                             date_from=date_from,
                             date_to=date_to,
                             sales_member_id=sales_member_id,
-                            user_role=user_role
+                            user_role=user_role,
+                            platform=platform,
                         )
                         tool_results.append({
                             "tool": "get_sales_closed",
-                            "input": {"date_from": date_from, "date_to": date_to, "sales_member_id": sales_member_id},
+                            "input": {"date_from": date_from, "date_to": date_to, "sales_member_id": sales_member_id, "platform": platform},
                             "output": result
                         })
 
@@ -129,16 +130,18 @@ async def db_query_node(state: AIAssistantState) -> AIAssistantState:
                         date_from = params.get("date_from")
                         date_to = params.get("date_to")
                         sales_member_id = params.get("sales_member_id")
+                        platform = params.get("platform")
                         result = await get_sales_unsuccessful(
                             user_id=user_id,
                             date_from=date_from,
                             date_to=date_to,
                             sales_member_id=sales_member_id,
-                            user_role=user_role
+                            user_role=user_role,
+                            platform=platform,
                         )
                         tool_results.append({
                             "tool": "get_sales_unsuccessful",
-                            "input": {"date_from": date_from, "date_to": date_to, "sales_member_id": sales_member_id},
+                            "input": {"date_from": date_from, "date_to": date_to, "sales_member_id": sales_member_id, "platform": platform},
                             "output": result
                         })
                     

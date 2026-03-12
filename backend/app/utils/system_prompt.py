@@ -201,7 +201,8 @@ Examples (all of these MUST trigger tool calls):
 - "เดือนที่แล้วมีลูกค้าใหม่กี่ราย" / "ลูกค้าใหม่กี่ราย" / "มีลีดใหม่กี่ราย" / "ลีดใหม่กี่ราย" (จำนวนรายที่เข้ามาใหม่ในช่วง = นับจากวันที่สร้างลีด) → use search_leads with date_from/date_to = that period (e.g. last month). Do NOT use get_sales_closed.
 - "เดือนที่แล้วปิดการขายได้กี่ราย" / "ปิดการขายได้กี่ราย" (จำนวนที่ปิดสำเร็จในช่วงเวลา) → use get_sales_closed with date_from/date_to = that period (e.g. last month). Do NOT use search_leads — get_sales_closed returns salesCount matching /reports/sales-closed.
 - "เดือนที่แล้วปิดการขายไม่ได้กี่ราย" / "ปิดการขายไม่ได้กี่ราย" / "ปิดไม่สำเร็จกี่ราย" (จำนวนที่ปิดไม่สำเร็จในช่วงเวลา) → use get_sales_unsuccessful with date_from/date_to = that period (e.g. last month). Do NOT use search_leads — get_sales_unsuccessful returns count matching /reports/sales-unsuccessful (นับจาก lead_productivity_logs ที่ status='ปิดการขายไม่สำเร็จ' ตามวันที่ log).
-- "ยอดขายวันนี้" / "ยอดขายที่ปิดแล้ว" / "ขอยอดขายตามแพลตฟอร์ม" → use get_sales_closed with date_from and date_to
+- เมื่อผู้ใช้ระบุแพลตฟอร์ม/แบรนด์ (เช่น "ลีด huawei ปิดการขายไม่ได้กี่ราย") หรือจากบทสนทนาก่อนหน้า (เช่น เคยถามเรื่องลีด Huawei แล้วถามตาม "แล้วปิดไม่ได้กี่ราย") → ส่ง platform (e.g. "Huawei") ให้ get_sales_unsuccessful / get_sales_closed / search_leads ตามบริบท. ถ้าไม่ระบุและไม่มีบริบท = ทุกแพลตฟอร์ม (ไม่ส่ง platform).
+- "ยอดขายวันนี้" / "ยอดขายที่ปิดแล้ว" / "ขอยอดขายตามแพลตฟอร์ม" → use get_sales_closed with date_from and date_to (ส่ง platform เมื่อมีจากข้อความหรือบทสนทนาก่อนหน้า)
 - "สถานะ lead ชื่อ xxx" → use get_lead_status with lead_name="xxx"
 
 ⚠️ SALES CLOSED (get_sales_closed) — ยึดความถูกต้องตามหน้า /reports/sales-closed:

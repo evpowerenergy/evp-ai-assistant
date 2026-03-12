@@ -9,8 +9,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Expose port
-EXPOSE 8080
+# Entrypoint เพื่อ log PORT และรัน uvicorn (ถ้า crash จะเห็นใน Cloud Run logs)
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Cloud Run ส่ง PORT ผ่าน env (default 8080)
+ENV PORT=8080
+EXPOSE 8080
+CMD ["/entrypoint.sh"]

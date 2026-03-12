@@ -26,6 +26,7 @@ interface ProcessStatusPanelProps {
 
 export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults, debugPrecompute, loadingHistory, modelConfig }: ProcessStatusPanelProps) {
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading) return
@@ -149,6 +150,55 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
     } catch {
       return String(obj)
     }
+  }
+
+  const toExportText = (value: any) => {
+    if (typeof value === 'string') return value
+    try {
+      return JSON.stringify(value, null, 2)
+    } catch {
+      return String(value)
+    }
+  }
+
+  const copyToClipboard = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedKey(key)
+      window.setTimeout(() => {
+        setCopiedKey((prev) => (prev === key ? null : prev))
+      }, 1500)
+    } catch {
+      // Fallback for older browsers / blocked clipboard API
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.left = '-9999px'
+      textarea.style.top = '0'
+      document.body.appendChild(textarea)
+      textarea.focus()
+      textarea.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(textarea)
+      if (ok) {
+        setCopiedKey(key)
+        window.setTimeout(() => {
+          setCopiedKey((prev) => (prev === key ? null : prev))
+        }, 1500)
+      }
+    }
+  }
+
+  const downloadTextFile = (filename: string, text: string, mimeType: string) => {
+    const blob = new Blob([text], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -311,7 +361,33 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
                   
                   {/* Output Preview */}
                   <div className="px-3 py-2">
-                    <p className="text-xs font-medium text-gray-700 mb-1">📤 Raw Data (Output):</p>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-gray-700">📤 Raw Data (Output):</p>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="rounded border bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+                          onClick={() => {
+                            const text = toExportText(result.output)
+                            void copyToClipboard(text, `out-${index}`)
+                          }}
+                        >
+                          {copiedKey === `out-${index}` ? 'Copied' : 'Copy'}
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+                          onClick={() => {
+                            const safeTool = String(result.tool || 'output').replace(/[^a-zA-Z0-9-_]+/g, '_')
+                            const ts = new Date().toISOString().replace(/[:.]/g, '-')
+                            const filename = `ai-assistant-${safeTool}-output-${ts}.json`
+                            downloadTextFile(filename, toExportText(result.output), 'application/json;charset=utf-8')
+                          }}
+                        >
+                          Export
+                        </button>
+                      </div>
+                    </div>
                     <pre className="text-xs text-gray-600 bg-gray-50 p-2 rounded border overflow-x-auto max-h-96 overflow-y-auto font-mono whitespace-pre-wrap break-words">
                       {formatJSON(result.output, Infinity)}
                     </pre>

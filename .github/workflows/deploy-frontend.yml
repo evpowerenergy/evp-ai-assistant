@@ -8,41 +8,53 @@ on:
       - 'frontend/**'
       - '.github/workflows/deploy-frontend.yml'
 
+env:
+  REGION: asia-southeast1
+  ARTIFACT_REPO: ai-assistant
+  SERVICE_NAME: ai-assistant-frontend
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-      
-      - name: Install dependencies
-        working-directory: ./frontend
-        run: npm ci
-      
-      - name: Build
-        working-directory: ./frontend
-        run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-      
+
+      - name: Set GCP project
+        run: |
+          if [ -n "${{ secrets.GCP_PROJECT_ID }}" ]; then
+            echo "PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" >> $GITHUB_ENV
+          else
+            echo "PROJECT_ID=ev-power-energy-prod" >> $GITHUB_ENV
+          fi
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-      
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set project
+        run: gcloud config set project ${{ env.PROJECT_ID }}
+
+      - name: Build and push image (Artifact Registry)
+        id: build
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/frontend:${{ github.sha }}"
+          echo "IMAGE=${IMAGE}" >> $GITHUB_OUTPUT
+          gcloud builds submit \
+            --config=frontend/cloudbuild.yaml \
+            --substitutions=_IMAGE="${IMAGE}",_NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}",_NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}",_NEXT_PUBLIC_API_URL="${{ secrets.NEXT_PUBLIC_API_URL }}" \
+            frontend
+
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy ai-assistant-frontend \
-            --source ./frontend \
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ steps.build.outputs.IMAGE }} \
+            --region ${{ env.REGION }} \
             --platform managed \
-            --region asia-southeast1 \
-            --allow-unauthenticated \
-            --port 8080
+            --port 8080 \
+            --allow-unauthenticated

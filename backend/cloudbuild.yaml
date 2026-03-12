@@ -1,0 +1,13 @@
+# Cloud Build สำหรับ AI Assistant Backend
+# รันจาก root: gcloud builds submit --config=backend/cloudbuild.yaml --substitutions=_IMAGE=... backend
+# หรือจาก GitHub Actions กับ project + Artifact Registry
+
+substitutions:
+  _IMAGE: ''
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '${_IMAGE}', '.']
+
+images:
+  - '${_IMAGE}'

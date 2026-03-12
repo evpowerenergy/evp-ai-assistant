@@ -97,16 +97,26 @@ async def _get_sales_closed_single_month(
     return {"success": False, "error": "No data returned", "data": {"salesLeads": [], "totalSalesValue": 0, "salesCount": 0}}
 
 
+def _lead_sales_value(lead: Dict[str, Any]) -> float:
+    """Get sales/quotation value for a lead (for sales closed filtering sum)."""
+    v = lead.get("totalQuotationAmount") or lead.get("total_quotation_amount") or lead.get("totalSalesAmount") or lead.get("total_sales_amount") or lead.get("quotation_value") or 0
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 async def get_sales_closed(
     user_id: str,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     sales_member_id: Optional[int] = None,
-    user_role: Optional[str] = None
+    user_role: Optional[str] = None,
+    platform: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Sales Closed report via RPC (matches /reports/sales-closed logic).
-    Passes date_from and date_to directly to RPC — no month expansion.
+    If platform is set, filter salesLeads by that platform so count/value match report filtered by platform.
     RPC: ai_get_sales_closed(user_id, date_from_ts, date_to_ts, sales_member_id, user_role)
     """
     try:
@@ -125,7 +135,10 @@ async def get_sales_closed(
                 }
             ).execute()
             if result.data:
-                return _normalize_sales_closed_response(result.data)
+                ret = _normalize_sales_closed_response(result.data)
+                if platform and ret.get("data"):
+                    _apply_platform_filter_sales_closed(ret["data"], platform)
+                return ret
             if result.error:
                 return {"success": False, "error": result.error.message}
             return {"success": False, "error": "No data returned", "data": {"salesLeads": [], "totalSalesValue": 0, "salesCount": 0}}
@@ -136,10 +149,57 @@ async def get_sales_closed(
         if ret.get("data") and isinstance(ret["data"], dict):
             ret["data"]["request_date_from"] = date_from
             ret["data"]["request_date_to"] = date_to
+            if platform:
+                _apply_platform_filter_sales_closed(ret["data"], platform)
         return ret
     except Exception as e:
         logger.error(f"❌ Error in get_sales_closed: {e}")
         return {"success": False, "error": str(e)}
+
+
+def _apply_platform_filter_sales_closed(data: Dict[str, Any], platform: str) -> None:
+    """Filter data['salesLeads'] by platform and recompute salesCount/totalSalesValue. Modifies data in place."""
+    platform_canon = _normalize_platform_filter(platform)
+    if not platform_canon:
+        return
+    leads = list(data.get("salesLeads") or [])
+    platform_canon_lower = platform_canon.lower()
+    filtered = [
+        l for l in leads
+        if (_lead_platform_value(l) or "").strip().lower() == platform_canon_lower
+    ]
+    data["salesLeads"] = filtered
+    data["salesCount"] = len(filtered)
+    data["totalSalesValue"] = sum(_lead_sales_value(l) for l in filtered)
+    data["request_platform"] = platform_canon
+    logger.info(f"   📊 get_sales_closed filtered by platform={platform_canon}: {len(filtered)} leads")
+
+
+# Map LLM/platform input to canonical platform value (as stored in leads)
+PLATFORM_NORMALIZE = {
+    "huawei": "Huawei",
+    "atmoc": "ATMOCE",
+    "atmoce": "ATMOCE",
+    "solar edge": "Solar Edge",
+    "solaredge": "Solar Edge",
+    "sigenergy": "Sigenergy",
+    "facebook": "Facebook",
+    "line": "Line",
+    "website": "Website",
+    "tiktok": "TikTok",
+    "ig": "IG",
+    "youtube": "YouTube",
+    "shopee": "Shopee",
+    "lazada": "Lazada",
+}
+
+
+def _normalize_platform_filter(platform: Optional[str]) -> Optional[str]:
+    """Return canonical platform value for filtering, or None if empty."""
+    if not platform or not str(platform).strip():
+        return None
+    s = str(platform).strip().lower()
+    return PLATFORM_NORMALIZE.get(s) or platform.strip()
 
 
 def _normalize_sales_unsuccessful_response(raw: Any) -> Dict[str, Any]:
@@ -166,17 +226,32 @@ def _normalize_sales_unsuccessful_response(raw: Any) -> Dict[str, Any]:
     }
 
 
+def _lead_platform_value(lead: Dict[str, Any]) -> Optional[str]:
+    """Get platform from lead dict (may be platform or lead_platform)."""
+    return lead.get("platform") or lead.get("lead_platform") or lead.get("platform_name")
+
+
+def _lead_quotation_amount(lead: Dict[str, Any]) -> float:
+    """Get quotation amount for a lead (for filtering sum)."""
+    v = lead.get("totalQuotationAmount") or lead.get("total_quotation_amount") or lead.get("quotation_value") or 0
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 async def get_sales_unsuccessful(
     user_id: str,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     sales_member_id: Optional[int] = None,
-    user_role: Optional[str] = None
+    user_role: Optional[str] = None,
+    platform: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Sales Unsuccessful report via RPC (matches /reports/sales-unsuccessful logic).
     ดึงจาก lead_productivity_logs ที่ status = 'ปิดการขายไม่สำเร็จ'
-    ใช้ log.created_at_thai (วันที่บันทึก) ไม่ใช่ lead.created_at_thai
+    If platform is set, filter unsuccessfulLeads by that platform so count/value match report filtered by platform.
     RPC: ai_get_sales_unsuccessful(user_id, date_from_ts, date_to_ts, sales_member_id, user_role)
     """
     try:
@@ -198,6 +273,20 @@ async def get_sales_unsuccessful(
             if ret.get("data") and isinstance(ret["data"], dict):
                 ret["data"]["request_date_from"] = date_from
                 ret["data"]["request_date_to"] = date_to
+                # Optional: filter by platform so count matches report when user asks e.g. "ลีด Huawei ปิดการขายไม่ได้กี่ราย"
+                platform_canon = _normalize_platform_filter(platform)
+                if platform_canon:
+                    leads = list(ret["data"].get("unsuccessfulLeads") or [])
+                    platform_canon_lower = platform_canon.lower()
+                    filtered = [
+                        l for l in leads
+                        if (_lead_platform_value(l) or "").strip().lower() == platform_canon_lower
+                    ]
+                    ret["data"]["unsuccessfulLeads"] = filtered
+                    ret["data"]["unsuccessfulCount"] = len(filtered)
+                    ret["data"]["totalQuotationValue"] = sum(_lead_quotation_amount(l) for l in filtered)
+                    ret["data"]["request_platform"] = platform_canon
+                    logger.info(f"   📊 get_sales_unsuccessful filtered by platform={platform_canon}: {len(filtered)} leads")
             return ret
         if result.error:
             return {"success": False, "error": result.error.message}
@@ -337,7 +426,8 @@ async def search_leads(
     user_role: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    status: Optional[str] = None  # NEW: Status filter parameter
+    status: Optional[str] = None,
+    platform: Optional[str] = None  # From LLM / context (applies PLATFORM RULE)
 ) -> Dict[str, Any]:
     """
     Search/List leads via RPC
@@ -483,6 +573,12 @@ async def search_leads(
         if status and status != 'sales_closed':
             final_filters['status'] = status
             logger.info(f"   📊 Status filter: {status}")
+        # Explicit platform from LLM/conversation context (PLATFORM RULE)
+        if platform and 'platform' not in final_filters:
+            platform_canon = _normalize_platform_filter(platform)
+            if platform_canon:
+                final_filters['platform'] = platform_canon
+                logger.info(f"   📊 Platform from context/params: {platform_canon}")
         
         # Extract phone number from query if not already in filters
         # Supports: "เบอร์โทร 0886030830", "เบอร์ 0886030830", "0886030830", etc.
