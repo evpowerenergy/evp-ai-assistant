@@ -4,6 +4,7 @@ import { useState, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { BrandLogo } from '@/components/ui/BrandLogo'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -29,20 +30,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-background px-4 py-12 text-foreground sm:px-6 lg:px-8">
+    <div className="liquid-bg relative flex min-h-screen items-center justify-center px-4 py-12 text-foreground sm:px-6 lg:px-8">
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>
-      <div className="w-full max-w-md space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-foreground">
-            Sign in to AI Assistant
+      <div className="glass-panel-strong glass-shine w-full max-w-md space-y-7 rounded-3xl border border-white/30 p-8">
+        <div className="flex flex-col items-center">
+          <BrandLogo size="lg" className="mb-4" />
+          <h2 className="text-center text-3xl font-bold tracking-tight text-foreground">
+            Sign in
           </h2>
           <p className="mt-2 text-center text-sm text-muted-foreground">
-            Internal AI Assistant & Knowledge Chatbot
+            Internal AI Chatbot Platform
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="rounded-md bg-red-50 p-4 dark:bg-red-950/50">
               <div className="flex">

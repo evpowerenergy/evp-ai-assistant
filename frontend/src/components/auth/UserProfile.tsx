@@ -18,20 +18,20 @@ export function UserProfile() {
   if (!user) return null
 
   return (
-    <div className="flex items-center gap-4">
-      <div className="text-right">
-        <p className="text-sm font-medium text-foreground">
+    <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-muted/40 px-2 py-1.5">
+      <div className="min-w-0 text-right">
+        <p className="max-w-[180px] truncate text-sm font-medium text-foreground md:max-w-[240px]">
           {user.email}
         </p>
-        <p className="text-xs text-muted-foreground capitalize">
+        <p className="hidden text-xs capitalize text-muted-foreground sm:block">
           {userRole || 'staff'}
         </p>
       </div>
       <button
         onClick={handleSignOut}
-        className="rounded-md bg-muted px-3 py-2 text-sm font-medium text-foreground hover:opacity-90"
+        className="rounded-lg bg-muted px-2.5 py-1.5 text-xs font-medium text-foreground transition hover:opacity-90"
       >
-        Sign Out
+        Logout
       </button>
     </div>
   )
