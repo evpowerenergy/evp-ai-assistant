@@ -21,8 +21,8 @@ export function MessageList({ messages, loading }: MessageListProps) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900">เริ่มสนทนา</h2>
-          <p className="mt-2 text-gray-600">ถามอะไรก็ได้เกี่ยวกับข้อมูล business หรือเอกสาร</p>
+          <h2 className="text-xl font-semibold text-foreground">เริ่มสนทนา</h2>
+          <p className="mt-2 text-muted-foreground">ถามอะไรก็ได้เกี่ยวกับข้อมูล business หรือเอกสาร</p>
         </div>
       </div>
     )
@@ -34,10 +34,10 @@ export function MessageList({ messages, loading }: MessageListProps) {
         <MessageBubble key={message.id} message={message} />
       ))}
       {loading && (
-        <div className="flex items-center gap-2 text-gray-600">
-          <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400"></div>
-          <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '0.2s' }}></div>
-          <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '0.4s' }}></div>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/70"></div>
+          <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/70" style={{ animationDelay: '0.2s' }}></div>
+          <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/70" style={{ animationDelay: '0.4s' }}></div>
         </div>
       )}
     </div>

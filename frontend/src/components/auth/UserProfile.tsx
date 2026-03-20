@@ -20,16 +20,16 @@ export function UserProfile() {
   return (
     <div className="flex items-center gap-4">
       <div className="text-right">
-        <p className="text-sm font-medium text-gray-900">
+        <p className="text-sm font-medium text-foreground">
           {user.email}
         </p>
-        <p className="text-xs text-gray-500 capitalize">
+        <p className="text-xs text-muted-foreground capitalize">
           {userRole || 'staff'}
         </p>
       </div>
       <button
         onClick={handleSignOut}
-        className="rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+        className="rounded-md bg-muted px-3 py-2 text-sm font-medium text-foreground hover:opacity-90"
       >
         Sign Out
       </button>

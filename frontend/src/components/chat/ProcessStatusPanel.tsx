@@ -77,8 +77,8 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
         )
       default:
         return (
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100">
-            <div className="h-2 w-2 rounded-full bg-gray-400"></div>
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted">
+            <div className="h-2 w-2 rounded-full bg-muted-foreground"></div>
           </div>
         )
     }
@@ -202,19 +202,19 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
   }
 
   return (
-    <div className="flex hidden h-full w-72 flex-shrink-0 flex-col overflow-hidden border-l bg-gray-50 lg:flex">
+    <div className="glass-panel hidden h-full w-72 flex-shrink-0 flex-col overflow-hidden border-l border-border/60 lg:flex">
       {/* Header - ชื่อ + Model + Runtime แยกบรรทัด ไม่ให้บัง */}
-      <div className="flex shrink-0 flex-col gap-1 border-b border-gray-200 bg-white p-3">
-        <h3 className="text-sm font-semibold text-gray-900">สถานะการประมวลผล</h3>
+      <div className="flex shrink-0 flex-col gap-1 border-b border-border/70 bg-transparent p-3">
+        <h3 className="text-sm font-semibold text-foreground">สถานะการประมวลผล</h3>
         {modelConfig && (
           <p className="text-xs font-medium text-indigo-600">
             Model: <span className="font-mono">{modelConfig.openai_model}</span>
-            <span className="ml-1 font-normal text-gray-500">({modelConfig.agents_count} agents)</span>
+            <span className="ml-1 font-normal text-muted-foreground">({modelConfig.agents_count} agents)</span>
           </p>
         )}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-600">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
           {runtime !== undefined && (
-            <span className="font-medium text-gray-700">Runtime: {formatTime(runtime)}</span>
+            <span className="font-medium text-foreground">Runtime: {formatTime(runtime)}</span>
           )}
           {loading && (
             <span className="text-blue-600">กำลังทำงาน: {formatTime(elapsedTime)}</span>
@@ -227,12 +227,12 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
         {/* Agents และ Model ที่ใช้ (แยกแต่ละตัว) */}
         {modelConfig && modelConfig.agents.length > 0 && (
           <div>
-            <h4 className="mb-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">Agents และ Model</h4>
-            <div className="rounded-lg border border-indigo-100 bg-white p-2.5">
+            <h4 className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agents และ Model</h4>
+            <div className="glass-panel rounded-lg border-indigo-200/70 p-2.5 dark:border-indigo-900/80">
               <ul className="space-y-2">
                 {modelConfig.agents.map((agent, i) => (
                   <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-xs">
-                    <span className="text-gray-800">{agent.name}</span>
+                    <span className="text-foreground">{agent.name}</span>
                     <span className="shrink-0 font-mono text-indigo-600">{agent.model}</span>
                   </li>
                 ))}
@@ -243,24 +243,24 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
 
         {/* โหลด History */}
         <div>
-          <h4 className="mb-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">โหลด History</h4>
-          <div className="rounded-lg border bg-white p-2.5">
+          <h4 className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">โหลด History</h4>
+          <div className="glass-panel rounded-lg p-2.5">
             <div className="flex items-center gap-2">
               {loadingHistory ? (
                 <>
                   <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100">
                     <div className="h-2 w-2 animate-pulse rounded-full bg-blue-600"></div>
                   </div>
-                  <p className="text-xs font-medium text-gray-900">กำลังโหลดประวัติการสนทนา...</p>
+                  <p className="text-xs font-medium text-foreground">กำลังโหลดประวัติการสนทนา...</p>
                 </>
               ) : (
                 <>
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100">
-                    <svg className="h-3 w-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted">
+                    <svg className="h-3 w-3 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                  <p className="text-xs text-gray-600">พร้อม</p>
+                  <p className="text-xs text-muted-foreground">พร้อม</p>
                 </>
               )}
             </div>
@@ -269,28 +269,28 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
 
         {/* สถานะการทำงาน - จำกัดความสูง + scroll */}
         <div>
-          <h4 className="mb-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wide">สถานะการทำงาน</h4>
+          <h4 className="mb-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">สถานะการทำงาน</h4>
           {processSteps && processSteps.length > 0 ? (
-            <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-lg border bg-gray-50/80 p-1.5">
+            <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-lg border border-border/70 bg-muted/30 p-1.5">
               {processSteps.map((step, index) => (
                 <div
                   key={`${step.name}-${index}`}
-                  className={`flex items-center gap-2 rounded border bg-white px-2 py-1.5 transition-all ${
+                  className={`glass-panel flex items-center gap-2 rounded border-white/25 px-2 py-1.5 transition-all ${
                     step.status === 'processing' ? 'ring-1 ring-blue-200' : ''
                   }`}
                 >
                   {getStepIcon(step.status)}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1">
-                      <p className="truncate text-xs font-medium text-gray-900">
+                      <p className="truncate text-xs font-medium text-foreground">
                         {(step as any).display_name || getStepName(step.name)}
                       </p>
                       {step.duration !== undefined && (
-                        <span className="shrink-0 text-xs text-gray-400">{formatTime(step.duration)}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{formatTime(step.duration)}</span>
                       )}
                     </div>
                     {step.preview && (
-                      <p className="truncate text-xs text-gray-500">{step.preview}</p>
+                      <p className="truncate text-xs text-muted-foreground">{step.preview}</p>
                     )}
                     {step.status === 'error' && step.data?.error && (
                       <p className="truncate text-xs text-red-600">{step.data.error}</p>
@@ -300,30 +300,30 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
               ))}
             </div>
           ) : loading ? (
-            <div className="flex items-center gap-2 rounded-lg border bg-white px-2 py-1.5">
+            <div className="glass-panel flex items-center gap-2 rounded-lg px-2 py-1.5">
               <div className="h-2 w-2 animate-pulse rounded-full bg-blue-600" />
-              <p className="text-xs text-gray-600">กำลังประมวลผล...</p>
+              <p className="text-xs text-muted-foreground">กำลังประมวลผล...</p>
             </div>
           ) : (
-            <p className="py-2 text-center text-xs text-gray-500">ยังไม่มีการประมวลผล</p>
+            <p className="py-2 text-center text-xs text-muted-foreground">ยังไม่มีการประมวลผล</p>
           )}
         </div>
 
         {/* Pre-compute (Debug) */}
         {debugPrecompute && Object.keys(debugPrecompute).length > 0 && (
           <div className="border-t pt-4">
-            <h4 className="mb-3 text-xs font-semibold text-gray-700 uppercase tracking-wide">Pre-compute (Debug)</h4>
+            <h4 className="mb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pre-compute (Debug)</h4>
             <div className="space-y-3">
               {Object.entries(debugPrecompute).map(([toolKey, summary]) => (
-                <div key={toolKey} className="rounded-lg border bg-amber-50 overflow-hidden">
-                  <div className="bg-amber-100 px-3 py-2 border-b">
-                    <p className="text-xs font-semibold text-gray-900">{toolKey}</p>
+                <div key={toolKey} className="overflow-hidden rounded-lg border border-amber-300/70 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
+                  <div className="border-b border-amber-300/70 bg-amber-100 px-3 py-2 dark:border-amber-900 dark:bg-amber-900/60">
+                    <p className="text-xs font-semibold text-foreground">{toolKey}</p>
                   </div>
                   <div className="px-3 py-2 space-y-2">
                     {typeof summary === 'object' && summary !== null && Object.entries(summary).map(([k, v]) => (
                       <div key={k}>
-                        <p className="text-xs font-medium text-gray-700 mb-0.5">{k}:</p>
-                        <pre className="text-xs text-gray-600 bg-white p-2 rounded border overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap break-words">
+                        <p className="mb-0.5 text-xs font-medium text-muted-foreground">{k}:</p>
+                        <pre className="max-h-32 overflow-x-auto overflow-y-auto whitespace-pre-wrap break-words rounded border border-border/70 bg-muted/30 p-2 text-xs text-muted-foreground">
                           {typeof v === 'string' ? v : JSON.stringify(v, null, 2)}
                         </pre>
                       </div>
@@ -338,22 +338,22 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
         {/* ด้านล่าง: ข้อมูลที่ดึงจากฟังก์ชัน */}
         {toolResults && toolResults.length > 0 && (
           <div className="border-t pt-4">
-            <h4 className="mb-3 text-xs font-semibold text-gray-700 uppercase tracking-wide">ข้อมูลที่ดึงจากฟังก์ชัน</h4>
+            <h4 className="mb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">ข้อมูลที่ดึงจากฟังก์ชัน</h4>
             <div className="space-y-3">
               {toolResults.map((result, index) => (
-                <div key={index} className="rounded-lg border bg-white overflow-hidden">
+                <div key={index} className="glass-panel overflow-hidden rounded-lg">
                   {/* Tool Name */}
-                  <div className="bg-gray-50 px-3 py-2 border-b">
-                    <p className="text-xs font-semibold text-gray-900">
+                  <div className="border-b border-border bg-muted/50 px-3 py-2">
+                    <p className="text-xs font-semibold text-foreground">
                       Function: <span className="text-blue-600">{result.tool || 'Unknown'}</span>
                     </p>
                   </div>
                   
                   {/* Input Parameters */}
                   {result.input && Object.keys(result.input).length > 0 && (
-                    <div className="px-3 py-2 border-b bg-gray-50">
-                      <p className="text-xs font-medium text-gray-700 mb-1">📥 Parameters (Input):</p>
-                      <pre className="text-xs text-gray-600 bg-white p-2 rounded border overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap break-words">
+                    <div className="border-b border-border bg-muted/50 px-3 py-2">
+                      <p className="mb-1 text-xs font-medium text-muted-foreground">📥 Parameters (Input):</p>
+                      <pre className="max-h-32 overflow-x-auto overflow-y-auto whitespace-pre-wrap break-words rounded border border-border/70 bg-muted/30 p-2 text-xs text-muted-foreground">
                         {formatJSON(result.input, Infinity)}
                       </pre>
                     </div>
@@ -362,11 +362,11 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
                   {/* Output Preview */}
                   <div className="px-3 py-2">
                     <div className="mb-1 flex items-center justify-between gap-2">
-                      <p className="text-xs font-medium text-gray-700">📤 Raw Data (Output):</p>
+                      <p className="text-xs font-medium text-muted-foreground">📤 Raw Data (Output):</p>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          className="rounded border bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+                          className="rounded border border-border/80 bg-muted/30 px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted/60"
                           onClick={() => {
                             const text = toExportText(result.output)
                             void copyToClipboard(text, `out-${index}`)
@@ -376,7 +376,7 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
                         </button>
                         <button
                           type="button"
-                          className="rounded border bg-white px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+                          className="rounded border border-border/80 bg-muted/30 px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted/60"
                           onClick={() => {
                             const safeTool = String(result.tool || 'output').replace(/[^a-zA-Z0-9-_]+/g, '_')
                             const ts = new Date().toISOString().replace(/[:.]/g, '-')
@@ -388,7 +388,7 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
                         </button>
                       </div>
                     </div>
-                    <pre className="text-xs text-gray-600 bg-gray-50 p-2 rounded border overflow-x-auto max-h-96 overflow-y-auto font-mono whitespace-pre-wrap break-words">
+                    <pre className="max-h-96 overflow-x-auto overflow-y-auto whitespace-pre-wrap break-words rounded border border-border/70 bg-muted/30 p-2 font-mono text-xs text-muted-foreground">
                       {formatJSON(result.output, Infinity)}
                     </pre>
                   </div>

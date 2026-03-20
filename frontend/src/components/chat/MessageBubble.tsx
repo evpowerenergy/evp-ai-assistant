@@ -25,7 +25,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         className={`max-w-3xl rounded-lg px-4 py-3 ${
           isUser
             ? 'bg-indigo-600 text-white'
-            : 'bg-white text-gray-900 shadow-sm border border-gray-200'
+            : 'glass-panel border-white/30 text-foreground'
         }`}
         style={{ 
           wordWrap: 'break-word',

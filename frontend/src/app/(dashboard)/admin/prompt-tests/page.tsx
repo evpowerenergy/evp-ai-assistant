@@ -305,18 +305,18 @@ export default function PromptTestsPage() {
   const roleOk = !userRole || allowedRoles.includes(userRole.toLowerCase().trim())
   if (!roleOk) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-          <p className="mt-2 text-gray-600">You need admin/manager/super_admin role to access this page.</p>
-          <p className="mt-2 text-sm text-gray-500">Your role: &quot;{userRole}&quot;</p>
+          <p className="mt-2 text-muted-foreground">You need admin/manager/super_admin role to access this page.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Your role: &quot;{userRole}&quot;</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="w-full max-w-full">
+    <div className="w-full max-w-full bg-background text-foreground">
       {/* แถบด้านบน: ปุ่มกลับไปแชท + หัวข้อ — พื้นหลังเข้ม ข้อความสีอ่อน */}
       <div className="flex flex-wrap items-center gap-4 border-b border-gray-700 bg-gray-800 px-4 py-3 sm:px-6 lg:px-8">
         <Link
@@ -346,27 +346,27 @@ export default function PromptTestsPage() {
       </div>
 
       {error && (
-        <div className="mb-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium leading-relaxed text-red-900">
+        <div className="mb-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium leading-relaxed text-red-900 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
           {error}
         </div>
       )}
 
-      <div className="mb-6 flex gap-1 border-b border-gray-200">
+      <div className="mb-6 flex gap-1 border-b border-border">
         <button
           onClick={() => setActiveTab('cases')}
-          className={`border-b-2 px-4 py-3 text-sm font-medium ${activeTab === 'cases' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
+          className={`border-b-2 px-4 py-3 text-sm font-medium ${activeTab === 'cases' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
         >
           Test Cases
         </button>
         <button
           onClick={() => setActiveTab('run')}
-          className={`border-b-2 px-4 py-3 text-sm font-medium ${activeTab === 'run' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
+          className={`border-b-2 px-4 py-3 text-sm font-medium ${activeTab === 'run' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
         >
           ผลลัพธ์ล่าสุด
         </button>
         <button
           onClick={() => setActiveTab('history')}
-          className={`border-b-2 px-4 py-3 text-sm font-medium ${activeTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
+          className={`border-b-2 px-4 py-3 text-sm font-medium ${activeTab === 'history' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
         >
           Run History
         </button>
@@ -374,28 +374,28 @@ export default function PromptTestsPage() {
 
       {activeTab === 'cases' && (
         <>
-          <form onSubmit={handleSubmit} className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-6 text-lg font-semibold text-gray-900">
+          <form onSubmit={handleSubmit} className="mb-8 rounded-lg border border-border bg-card p-6 shadow-sm">
+            <h2 className="mb-6 text-lg font-semibold text-foreground">
               {editingId ? 'แก้ไข Test Case' : 'เพิ่ม Test Case'}
             </h2>
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className="mb-2 block text-sm font-medium text-gray-800">User Message *</label>
+                <label className="mb-2 block text-sm font-medium text-muted-foreground">User Message *</label>
                 <textarea
                   value={form.user_message}
                   onChange={(e) => setForm((f) => ({ ...f, user_message: e.target.value }))}
                   rows={3}
-                  className="min-h-[4.5rem] w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm leading-normal text-gray-900 placeholder:text-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="min-h-[4.5rem] w-full resize-y rounded-md border border-border bg-input px-3 py-2.5 text-sm leading-normal text-foreground placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   placeholder="เดือนที่แล้วปิดการขายได้กี่ราย"
                   required
                 />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-800">Expected Intent</label>
+                <label className="mb-2 block text-sm font-medium text-muted-foreground">Expected Intent</label>
                 <select
                   value={form.expected_intent}
                   onChange={(e) => setForm((f) => ({ ...f, expected_intent: e.target.value }))}
-                  className="min-h-[2.5rem] w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm leading-normal text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="min-h-[2.5rem] w-full rounded-md border border-border bg-input px-3 py-2.5 text-sm leading-normal text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
                   {EXPECTED_INTENT_OPTIONS.map((opt) => (
                     <option key={opt.value || 'empty'} value={opt.value}>
@@ -405,11 +405,11 @@ export default function PromptTestsPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-800">Expected Tool</label>
+                <label className="mb-2 block text-sm font-medium text-muted-foreground">Expected Tool</label>
                 <select
                   value={form.expected_tool}
                   onChange={(e) => setForm((f) => ({ ...f, expected_tool: e.target.value }))}
-                  className="min-h-[2.5rem] w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm leading-normal text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="min-h-[2.5rem] w-full rounded-md border border-border bg-input px-3 py-2.5 text-sm leading-normal text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
                   {EXPECTED_TOOL_OPTIONS.map((opt) => (
                     <option key={opt.value || 'empty'} value={opt.value}>
@@ -419,17 +419,17 @@ export default function PromptTestsPage() {
                 </select>
               </div>
               <div className="sm:col-span-2">
-                <label className="mb-2 block text-sm font-medium text-gray-800">Expected Message (อ้างอิงเท่านั้น — ไม่ใช้ตัด Pass/Fail)</label>
+                <label className="mb-2 block text-sm font-medium text-muted-foreground">Expected Message (อ้างอิงเท่านั้น — ไม่ใช้ตัด Pass/Fail)</label>
                 <textarea
                   value={form.expected_message}
                   onChange={(e) => setForm((f) => ({ ...f, expected_message: e.target.value }))}
                   rows={4}
-                  className="min-h-[6rem] w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm leading-normal text-gray-900 placeholder:text-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="min-h-[6rem] w-full resize-y rounded-md border border-border bg-input px-3 py-2.5 text-sm leading-normal text-foreground placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   placeholder="ข้อความตัวอย่างที่คาดหวัง หรือสรุปหลักๆ ที่ต้องมี"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-800">Similarity Threshold (0–1)</label>
+                <label className="mb-2 block text-sm font-medium text-muted-foreground">Similarity Threshold (0–1)</label>
                 <input
                   type="number"
                   min={0}
@@ -437,16 +437,16 @@ export default function PromptTestsPage() {
                   step={0.05}
                   value={form.similarity_threshold}
                   onChange={(e) => setForm((f) => ({ ...f, similarity_threshold: parseFloat(e.target.value) || 0.7 }))}
-                  className="min-h-[2.5rem] w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm leading-normal text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="min-h-[2.5rem] w-full rounded-md border border-border bg-input px-3 py-2.5 text-sm leading-normal text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-800">Notes</label>
+                <label className="mb-2 block text-sm font-medium text-muted-foreground">Notes</label>
                 <input
                   type="text"
                   value={form.notes}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  className="min-h-[2.5rem] w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm leading-normal text-gray-900 placeholder:text-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="min-h-[2.5rem] w-full rounded-md border border-border bg-input px-3 py-2.5 text-sm leading-normal text-foreground placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
             </div>
@@ -455,46 +455,46 @@ export default function PromptTestsPage() {
                 {editingId ? 'บันทึก' : 'เพิ่ม'}
               </button>
               {editingId && (
-                <button type="button" onClick={() => { setEditingId(null); setForm({ user_message: '', expected_intent: '', expected_tool: '', expected_message: '', similarity_threshold: 0.7, notes: '' }); }} className="rounded border border-gray-400 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                <button type="button" onClick={() => { setEditingId(null); setForm({ user_message: '', expected_intent: '', expected_tool: '', expected_message: '', similarity_threshold: 0.7, notes: '' }); }} className="rounded border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
                   ยกเลิก
                 </button>
               )}
             </div>
           </form>
 
-          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h2 className="text-lg font-semibold leading-snug text-gray-900">Test Cases ({cases.length})</h2>
+          <div className="rounded-lg border border-border bg-card shadow-sm">
+            <div className="border-b border-border px-6 py-4">
+              <h2 className="text-lg font-semibold leading-snug text-foreground">Test Cases ({cases.length})</h2>
             </div>
             {loading ? (
-              <div className="px-6 py-12 text-center text-sm leading-relaxed text-gray-600">Loading...</div>
+              <div className="px-6 py-12 text-center text-sm leading-relaxed text-muted-foreground">Loading...</div>
             ) : cases.length === 0 ? (
-              <div className="px-6 py-12 text-center text-sm leading-relaxed text-gray-600">ยังไม่มี test case</div>
+              <div className="px-6 py-12 text-center text-sm leading-relaxed text-muted-foreground">ยังไม่มี test case</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-border">
+                  <thead className="bg-muted/50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">User Message</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Expected Intent</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Expected Tool</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Expected Message</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Similarity</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">User Message</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Expected Intent</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Expected Tool</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Expected Message</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Similarity</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
+                  <tbody className="divide-y divide-border bg-card">
                     {cases.map((tc) => (
-                      <tr key={tc.id} className="hover:bg-gray-50">
-                        <td className="min-w-[12rem] max-w-none align-top px-4 py-3 text-sm leading-relaxed text-gray-900">
+                      <tr key={tc.id} className="hover:bg-muted/50">
+                        <td className="min-w-[12rem] max-w-none align-top px-4 py-3 text-sm leading-relaxed text-foreground">
                           <span className="block break-words whitespace-pre-wrap">{tc.user_message}</span>
                         </td>
-                        <td className="align-top px-4 py-3 text-sm leading-relaxed text-gray-800">{tc.expected_intent || '-'}</td>
-                        <td className="align-top px-4 py-3 text-sm leading-relaxed text-gray-800">{tc.expected_tool || '-'}</td>
-                        <td className="min-w-[12rem] max-w-none align-top px-4 py-3 text-sm leading-relaxed text-gray-900">
+                        <td className="align-top px-4 py-3 text-sm leading-relaxed text-muted-foreground">{tc.expected_intent || '-'}</td>
+                        <td className="align-top px-4 py-3 text-sm leading-relaxed text-muted-foreground">{tc.expected_tool || '-'}</td>
+                        <td className="min-w-[12rem] max-w-none align-top px-4 py-3 text-sm leading-relaxed text-foreground">
                           <span className="block break-words whitespace-pre-wrap">{tc.expected_message || '-'}</span>
                         </td>
-                        <td className="align-top px-4 py-3 text-sm leading-relaxed text-gray-800">{tc.similarity_threshold ?? 0.7}</td>
+                        <td className="align-top px-4 py-3 text-sm leading-relaxed text-muted-foreground">{tc.similarity_threshold ?? 0.7}</td>
                         <td className="whitespace-nowrap align-top px-4 py-3">
                           <button onClick={() => handleEdit(tc)} className="mr-2 text-sm text-indigo-600 hover:underline">Edit</button>
                           <button onClick={() => handleDelete(tc.id)} className="text-sm text-red-600 hover:underline">Delete</button>
@@ -510,73 +510,73 @@ export default function PromptTestsPage() {
       )}
 
       {activeTab === 'run' && (
-        <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="rounded-lg border border-border bg-card shadow-sm">
           {runResult ? (
             <>
-              <div className="border-b border-gray-200 px-6 py-4">
-                <h2 className="text-lg font-semibold leading-snug text-gray-900">ผลลัพธ์ Run</h2>
-                <p className="mt-2 text-sm leading-relaxed text-gray-800">
+              <div className="border-b border-border px-6 py-4">
+                <h2 className="text-lg font-semibold leading-snug text-foreground">ผลลัพธ์ Run</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   {running ? (
-                    <span className="text-gray-600">กำลังรัน... (ผล Pass/Fail จะอัปเดตเมื่อเสร็จ)</span>
+                    <span className="text-muted-foreground">กำลังรัน... (ผล Pass/Fail จะอัปเดตเมื่อเสร็จ)</span>
                   ) : (
-                    <>Pass: <span className="font-medium text-green-700">{runResult.passed}</span> / Fail: <span className="font-medium text-red-700">{runResult.failed}</span> / Total: <span className="font-medium text-gray-900">{runResult.total}</span></>
+                    <>Pass: <span className="font-medium text-green-700 dark:text-green-300">{runResult.passed}</span> / Fail: <span className="font-medium text-red-700 dark:text-red-300">{runResult.failed}</span> / Total: <span className="font-medium text-foreground">{runResult.total}</span></>
                   )}
                 </p>
-                <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                   Dynamic: Pass = ไม่ error + Intent ตรง (ถ้าระบุ) + Tool ตรง (ถ้าระบุ) — คอลัมน์ Expected / Score เป็นข้อมูลอ้างอิงเท่านั้น ไม่ใช้ตัด Pass/Fail
                 </p>
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-border">
+                  <thead className="bg-muted/50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">User Message</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Intent (จาก agent)</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Expected Intent</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Tool (จาก agent)</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Expected Tool</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">AI Message</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Expected (อ้างอิง)</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Score (อ้างอิง)</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-700">Pass/Fail</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">User Message</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Intent (จาก agent)</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Expected Intent</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Tool (จาก agent)</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Expected Tool</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">AI Message</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Expected (อ้างอิง)</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Score (อ้างอิง)</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">Pass/Fail</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
+                  <tbody className="divide-y divide-border bg-card">
                     {runResult.results.map((r, i) => {
                       const isOutputLoading = r.pass_fail === null
                       const intentMatch = !r.expected_intent || (r.actual_intent || '').toLowerCase() === (r.expected_intent || '').toLowerCase()
                       const toolMatch = !r.expected_tool || (r.actual_tool || '').toLowerCase() === (r.expected_tool || '').toLowerCase()
                       return (
-                        <tr key={i} className={r.pass_fail === 'fail' ? 'bg-red-50' : ''}>
-                          <td className="min-w-[12rem] max-w-none px-4 py-3 text-sm leading-relaxed text-gray-900 align-top">
+                        <tr key={i} className={r.pass_fail === 'fail' ? 'bg-red-50 dark:bg-red-950/40' : ''}>
+                          <td className="min-w-[12rem] max-w-none px-4 py-3 text-sm leading-relaxed text-foreground align-top">
                             <span className="block break-words whitespace-pre-wrap">{r.user_message}</span>
                           </td>
-                          <td className="align-top px-4 py-3 text-sm leading-relaxed text-gray-800">
-                            {isOutputLoading ? <span className="text-gray-500 italic">กำลังรัน...</span> : (r.actual_intent || '-')}
+                          <td className="align-top px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+                            {isOutputLoading ? <span className="text-muted-foreground italic">กำลังรัน...</span> : (r.actual_intent || '-')}
                           </td>
-                          <td className={`align-top px-4 py-3 text-sm leading-relaxed ${isOutputLoading ? 'text-gray-800' : (intentMatch ? 'text-gray-800' : 'text-amber-700')}`}>
+                          <td className={`align-top px-4 py-3 text-sm leading-relaxed ${isOutputLoading ? 'text-muted-foreground' : (intentMatch ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-300')}`}>
                             {r.expected_intent || '-'}
                             {r.expected_intent && !isOutputLoading && !intentMatch && <span className="ml-1 text-amber-600" title="ไม่ตรงกับ agent">≠</span>}
                           </td>
-                          <td className="align-top px-4 py-3 text-sm leading-relaxed text-gray-800">
-                            {isOutputLoading ? <span className="text-gray-500 italic">กำลังรัน...</span> : (r.actual_tool || '-')}
+                          <td className="align-top px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+                            {isOutputLoading ? <span className="text-muted-foreground italic">กำลังรัน...</span> : (r.actual_tool || '-')}
                           </td>
-                          <td className={`align-top px-4 py-3 text-sm leading-relaxed ${isOutputLoading ? 'text-gray-800' : (toolMatch ? 'text-gray-800' : 'text-amber-700')}`}>
+                          <td className={`align-top px-4 py-3 text-sm leading-relaxed ${isOutputLoading ? 'text-muted-foreground' : (toolMatch ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-300')}`}>
                             {r.expected_tool || '-'}
                             {r.expected_tool && !isOutputLoading && !toolMatch && <span className="ml-1 text-amber-600" title="ไม่ตรงกับ agent">≠</span>}
                           </td>
-                          <td className="min-w-[12rem] max-w-none px-4 py-3 text-sm leading-relaxed text-gray-900 align-top">
-                            {isOutputLoading ? <span className="text-gray-500 italic">กำลังรัน...</span> : <span className="block break-words whitespace-pre-wrap">{r.ai_message || '-'}</span>}
+                          <td className="min-w-[12rem] max-w-none px-4 py-3 text-sm leading-relaxed text-foreground align-top">
+                            {isOutputLoading ? <span className="text-muted-foreground italic">กำลังรัน...</span> : <span className="block break-words whitespace-pre-wrap">{r.ai_message || '-'}</span>}
                           </td>
-                          <td className="min-w-[12rem] max-w-none px-4 py-3 text-sm leading-relaxed text-gray-900 align-top">
+                          <td className="min-w-[12rem] max-w-none px-4 py-3 text-sm leading-relaxed text-foreground align-top">
                             <span className="block break-words whitespace-pre-wrap">{r.expected_message || '-'}</span>
                           </td>
-                          <td className="align-top px-4 py-3 text-sm leading-relaxed text-gray-800">
-                            {isOutputLoading ? <span className="text-gray-500 italic">กำลังรัน...</span> : (r.similarity_score != null ? r.similarity_score.toFixed(4) : '-')}
+                          <td className="align-top px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+                            {isOutputLoading ? <span className="text-muted-foreground italic">กำลังรัน...</span> : (r.similarity_score != null ? r.similarity_score.toFixed(4) : '-')}
                           </td>
                           <td className="align-top px-4 py-3">
                             {isOutputLoading ? (
-                              <span className="text-gray-500 italic">กำลังรัน...</span>
+                              <span className="text-muted-foreground italic">กำลังรัน...</span>
                             ) : (
                               <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${r.pass_fail === 'pass' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                 {r.pass_fail}
@@ -591,27 +591,27 @@ export default function PromptTestsPage() {
               </div>
             </>
           ) : loadingLatestRun ? (
-            <div className="px-6 py-12 text-center text-sm leading-relaxed text-gray-600">กำลังโหลดผลลัพธ์ล่าสุด...</div>
+            <div className="px-6 py-12 text-center text-sm leading-relaxed text-muted-foreground">กำลังโหลดผลลัพธ์ล่าสุด...</div>
           ) : (
-            <div className="px-6 py-12 text-center text-sm leading-relaxed text-gray-600">ยังไม่มีผลการรัน — กด Run All Tests หรือเลือกจาก Run History</div>
+            <div className="px-6 py-12 text-center text-sm leading-relaxed text-muted-foreground">ยังไม่มีผลการรัน — กด Run All Tests หรือเลือกจาก Run History</div>
           )}
         </div>
       )}
 
       {activeTab === 'history' && (
-        <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <h2 className="text-lg font-semibold leading-snug text-gray-900">Run History</h2>
+        <div className="rounded-lg border border-border bg-card shadow-sm">
+          <div className="border-b border-border px-6 py-4">
+            <h2 className="text-lg font-semibold leading-snug text-foreground">Run History</h2>
           </div>
           {runs.length === 0 ? (
-            <div className="px-6 py-12 text-center text-sm leading-relaxed text-gray-600">ยังไม่มี run</div>
+            <div className="px-6 py-12 text-center text-sm leading-relaxed text-muted-foreground">ยังไม่มี run</div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-border">
               {runs.map((r) => (
-                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-6 py-3 hover:bg-gray-50">
+                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-6 py-3 hover:bg-muted/50">
                   <div className="min-w-0 text-sm leading-relaxed">
-                    <span className="font-medium text-gray-900">{new Date(r.run_at).toLocaleString('th-TH')}</span>
-                    <span className="ml-3 text-gray-700">Total: {r.total} | Pass: {r.passed} | Fail: {r.failed}</span>
+                    <span className="font-medium text-foreground">{new Date(r.run_at).toLocaleString('th-TH')}</span>
+                    <span className="ml-3 text-muted-foreground">Total: {r.total} | Pass: {r.passed} | Fail: {r.failed}</span>
                   </div>
                   <button onClick={() => loadRunDetail(r.id)} className="shrink-0 text-sm text-indigo-600 hover:underline">
                     ดูผล

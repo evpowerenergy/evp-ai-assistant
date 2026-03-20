@@ -61,47 +61,47 @@ export function LineLinking() {
 
   if (loading) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <div className="rounded-lg border border-border bg-card p-6">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-          <p className="mt-4 text-gray-600">Loading LINE linkings...</p>
+          <p className="mt-4 text-muted-foreground">Loading LINE linkings...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-200 px-6 py-4">
-        <h2 className="text-lg font-semibold text-gray-900">LINE User Linking ({linkings.length})</h2>
-        <p className="mt-1 text-sm text-gray-600">
+    <div className="rounded-lg border border-border bg-card shadow-sm">
+      <div className="border-b border-border px-6 py-4">
+        <h2 className="text-lg font-semibold text-foreground">LINE User Linking ({linkings.length})</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage LINE user account linking for notifications
         </p>
       </div>
 
       {error && (
         <div className="px-6 py-4">
-          <div className="rounded-md bg-red-50 p-4">
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="rounded-md bg-red-50 p-4 dark:bg-red-950/50">
+            <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
           </div>
         </div>
       )}
 
       {linkings.length === 0 ? (
         <div className="px-6 py-12 text-center">
-          <p className="text-gray-500">No LINE accounts linked yet</p>
+          <p className="text-muted-foreground">No LINE accounts linked yet</p>
         </div>
       ) : (
-        <div className="divide-y divide-gray-200">
+        <div className="divide-y divide-border">
           {linkings.map((link) => (
-            <div key={link.id} className="px-6 py-4 hover:bg-gray-50">
+            <div key={link.id} className="px-6 py-4 hover:bg-muted/50">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">User ID: {link.user_id}</p>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="text-sm font-medium text-foreground">User ID: {link.user_id}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
                     LINE User ID: {link.line_user_id}
                   </p>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Linked: {new Date(link.linked_at).toLocaleString('th-TH')}
                   </p>
                 </div>

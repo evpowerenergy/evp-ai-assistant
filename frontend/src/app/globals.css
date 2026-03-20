@@ -5,17 +5,77 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --border: #e5e7eb;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --input: #ffffff;
+  --ring: #6366f1;
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-bg-strong: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-highlight: rgba(255, 255, 255, 0.75);
+  --glass-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --background: #0b1020;
+  --foreground: #e5e7eb;
+  --card: #111827;
+  --card-foreground: #f3f4f6;
+  --border: #374151;
+  --muted: #1f2937;
+  --muted-foreground: #9ca3af;
+  --input: #111827;
+  --ring: #818cf8;
+  --glass-bg: rgba(17, 24, 39, 0.56);
+  --glass-bg-strong: rgba(17, 24, 39, 0.74);
+  --glass-border: rgba(148, 163, 184, 0.26);
+  --glass-highlight: rgba(148, 163, 184, 0.2);
+  --glass-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.liquid-bg {
+  background:
+    radial-gradient(900px circle at 0% 0%, rgba(129, 140, 248, 0.16), transparent 55%),
+    radial-gradient(760px circle at 100% 0%, rgba(56, 189, 248, 0.14), transparent 48%),
+    radial-gradient(680px circle at 50% 100%, rgba(236, 72, 153, 0.08), transparent 46%),
+    var(--background);
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+.glass-panel-strong {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(22px) saturate(175%);
+  -webkit-backdrop-filter: blur(22px) saturate(175%);
+}
+
+.glass-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 20%, var(--glass-highlight) 45%, transparent 70%);
+  opacity: 0.15;
 }

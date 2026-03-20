@@ -11,12 +11,12 @@ export default function AdminPage() {
 
   if (!allowed) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-          <p className="mt-2 text-gray-600">You don't have permission to access this page.</p>
+          <p className="mt-2 text-muted-foreground">You don't have permission to access this page.</p>
           {userRole != null && (
-            <p className="mt-2 text-sm text-gray-500">Your role: &quot;{userRole}&quot;</p>
+            <p className="mt-2 text-sm text-muted-foreground">Your role: &quot;{userRole}&quot;</p>
           )}
         </div>
       </div>
@@ -24,7 +24,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="w-full max-w-full">
+    <div className="w-full max-w-full bg-background text-foreground">
       {/* แถบด้านบน: ปุ่มกลับไปแชท + หัวข้อ — พื้นหลังเข้ม ข้อความสีอ่อน */}
       <div className="flex flex-wrap items-center gap-4 border-b border-gray-700 bg-gray-800 px-4 py-3 sm:px-6 lg:px-8">
         <Link
@@ -46,34 +46,34 @@ export default function AdminPage() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Link
           href="/admin/documents"
-          className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+          className="rounded-lg border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
         >
-          <h2 className="text-lg font-semibold text-gray-900">Documents</h2>
-          <p className="mt-2 text-sm text-gray-600">Upload and manage knowledge base documents</p>
+          <h2 className="text-lg font-semibold text-foreground">Documents</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Upload and manage knowledge base documents</p>
         </Link>
 
         <Link
           href="/admin/logs"
-          className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+          className="rounded-lg border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
         >
-          <h2 className="text-lg font-semibold text-gray-900">Audit Logs</h2>
-          <p className="mt-2 text-sm text-gray-600">View system audit logs and activity</p>
+          <h2 className="text-lg font-semibold text-foreground">Audit Logs</h2>
+          <p className="mt-2 text-sm text-muted-foreground">View system audit logs and activity</p>
         </Link>
 
         <Link
           href="/admin/line"
-          className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+          className="rounded-lg border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
         >
-          <h2 className="text-lg font-semibold text-gray-900">LINE Integration</h2>
-          <p className="mt-2 text-sm text-gray-600">Manage LINE user linking and notifications</p>
+          <h2 className="text-lg font-semibold text-foreground">LINE Integration</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Manage LINE user linking and notifications</p>
         </Link>
 
         <Link
           href="/admin/prompt-tests"
-          className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+          className="rounded-lg border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
         >
-          <h2 className="text-lg font-semibold text-gray-900">Prompt E2E Tests</h2>
-          <p className="mt-2 text-sm text-gray-600">Manage test cases and run regression tests with embedding similarity</p>
+          <h2 className="text-lg font-semibold text-foreground">Prompt E2E Tests</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Manage test cases and run regression tests with embedding similarity</p>
         </Link>
       </div>
       </div>

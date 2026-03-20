@@ -33,8 +33,8 @@ export function FeedbackButtons({ messageId }: FeedbackButtonsProps) {
         onClick={() => handleFeedback('positive')}
         className={`rounded-md p-1.5 transition-colors ${
           feedback === 'positive'
-            ? 'bg-green-100 text-green-700'
-            : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+            ? 'bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-300'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
         }`}
         aria-label="Thumbs up"
       >
@@ -46,8 +46,8 @@ export function FeedbackButtons({ messageId }: FeedbackButtonsProps) {
         onClick={() => handleFeedback('negative')}
         className={`rounded-md p-1.5 transition-colors ${
           feedback === 'negative'
-            ? 'bg-red-100 text-red-700'
-            : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+            ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
         }`}
         aria-label="Thumbs down"
       >

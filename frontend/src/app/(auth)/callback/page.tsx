@@ -23,10 +23,10 @@ export default function AuthCallbackPage() {
   }, [router, supabase.auth])
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
       <div className="text-center">
         <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-        <p className="mt-4 text-gray-600">Completing sign in...</p>
+        <p className="mt-4 text-muted-foreground">Completing sign in...</p>
       </div>
     </div>
   )

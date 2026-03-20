@@ -19,10 +19,10 @@ export default function Home() {
   }, [user, loading, router])
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
+    <main className="flex min-h-screen items-center justify-center bg-background text-foreground">
       <div className="text-center">
         <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-        <p className="mt-4 text-gray-600">Loading...</p>
+        <p className="mt-4 text-muted-foreground">Loading...</p>
       </div>
     </main>
   )

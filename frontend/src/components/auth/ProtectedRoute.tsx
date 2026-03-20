@@ -36,10 +36,10 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
         </div>
       </div>
     )
@@ -51,11 +51,11 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
   if (requiredRole && userRole && !hasRole) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-          <p className="mt-2 text-gray-600">You don't have permission to access this page.</p>
-          <p className="mt-2 text-sm text-gray-500">Your role: &quot;{userRole}&quot; — required: {requiredRole.join(', ')}</p>
+          <p className="mt-2 text-muted-foreground">You don't have permission to access this page.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Your role: &quot;{userRole}&quot; — required: {requiredRole.join(', ')}</p>
         </div>
       </div>
     )

@@ -44,10 +44,10 @@ export function DocumentList() {
 
   if (loading) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <div className="rounded-lg border border-border bg-card p-6">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
-          <p className="mt-4 text-gray-600">Loading documents...</p>
+          <p className="mt-4 text-muted-foreground">Loading documents...</p>
         </div>
       </div>
     )
@@ -55,35 +55,35 @@ export function DocumentList() {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-        <p className="text-sm text-red-800">{error}</p>
+      <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950/50">
+        <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
       </div>
     )
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-200 px-6 py-4">
-        <h2 className="text-lg font-semibold text-gray-900">Documents ({documents.length})</h2>
+    <div className="rounded-lg border border-border bg-card shadow-sm">
+      <div className="border-b border-border px-6 py-4">
+        <h2 className="text-lg font-semibold text-foreground">Documents ({documents.length})</h2>
       </div>
 
       {documents.length === 0 ? (
         <div className="px-6 py-12 text-center">
-          <p className="text-gray-500">No documents uploaded yet</p>
+          <p className="text-muted-foreground">No documents uploaded yet</p>
         </div>
       ) : (
-        <div className="divide-y divide-gray-200">
+        <div className="divide-y divide-border">
           {documents.map((doc) => (
-            <div key={doc.id} className="px-6 py-4 hover:bg-gray-50">
+            <div key={doc.id} className="px-6 py-4 hover:bg-muted/50">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <h3 className="text-sm font-medium text-gray-900">{doc.title}</h3>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <h3 className="text-sm font-medium text-foreground">{doc.title}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {doc.file_type} • {new Date(doc.created_at).toLocaleDateString('th-TH')}
                   </p>
                 </div>
                 <div className="ml-4">
-                  <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
+                  <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300">
                     {doc.file_type}
                   </span>
                 </div>
