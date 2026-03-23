@@ -61,8 +61,23 @@ gcloud run deploy "$SERVICE_NAME" \
   --port 8080 \
   --no-allow-unauthenticated
 
+# Deploy ด้วย --no-allow-unauthenticated จะไม่เปิดสาธารณะ — ต้อง bind invoker แยก
+# (บาง org ใช้ --allow-unauthenticated ไม่ได้ แต่ add-iam-policy-binding allUsers ยังทำได้)
+if [[ "${CLOUD_RUN_PUBLIC:-1}" == "1" ]]; then
+  echo ""
+  echo "🔓 Granting public invoker (allUsers) so custom domain /login ไม่ขึ้น Forbidden..."
+  gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
+    --region="$REGION" \
+    --member="allUsers" \
+    --role="roles/run.invoker" \
+    --quiet
+fi
+
 echo ""
 echo "✅ Deploy frontend เสร็จแล้ว"
-echo "   ถ้าเปิด URL แล้ว Forbidden: ให้สิทธิ์ invoker (เลือกอย่างใดอย่างหนึ่ง):"
-echo "   • ทุกคน: gcloud run services add-iam-policy-binding $SERVICE_NAME --region=$REGION --member=allUsers --role=roles/run.invoker"
-echo "   • เฉพาะคุณ: gcloud run services add-iam-policy-binding $SERVICE_NAME --region=$REGION --member=user:YOUR_EMAIL --role=roles/run.invoker"
+if [[ "${CLOUD_RUN_PUBLIC:-1}" != "1" ]]; then
+  echo "   ถ้าเปิด URL แล้ว Forbidden: ให้สิทธิ์ invoker (เลือกอย่างใดอย่างหนึ่ง):"
+  echo "   • ทุกคน: gcloud run services add-iam-policy-binding $SERVICE_NAME --region=$REGION --member=allUsers --role=roles/run.invoker"
+  echo "   • เฉพาะคุณ: gcloud run services add-iam-policy-binding $SERVICE_NAME --region=$REGION --member=user:YOUR_EMAIL --role=roles/run.invoker"
+  echo "   หรือตั้ง CLOUD_RUN_PUBLIC=1 ใน .env.cloudrun แล้ว deploy ใหม่"
+fi
