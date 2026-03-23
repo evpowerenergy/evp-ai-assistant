@@ -138,6 +138,8 @@ OPENAI_API_KEY=your_openai_api_key
 CORS_ORIGINS=http://localhost:3000
 ```
 
+**Production (Cloud Run + custom domain):** ตั้ง `CORS_ORIGINS` ให้รวม **origin ของหน้าเว็บจริง** (เช่น `https://assistant.evpowerenergy.com`) คั่นด้วย comma ร่วมกับ URL แบบ `*.run.app` ถ้ายังเปิดผ่าน URL เดิมได้ — ถ้าไม่ใส่ custom domain จะเกิด error แบบ *No `Access-Control-Allow-Origin` header* ในเบราว์เซอร์
+
 ### Frontend Environment Variables
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
