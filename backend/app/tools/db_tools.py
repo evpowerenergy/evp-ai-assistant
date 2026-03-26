@@ -391,7 +391,7 @@ async def get_team_kpi(
 ) -> Dict[str, Any]:
     """
     Get team KPI via RPC
-    RPC: ai_get_team_kpi(user_id, team_id, category, date_from, date_to, user_role)
+    RPC: ai_get_team_kpi(user_id, team_id, category, date_from, date_to)
     """
     try:
         supabase = get_supabase_client()
@@ -403,8 +403,7 @@ async def get_team_kpi(
                 "p_team_id": team_id,
                 "p_category": category,
                 "p_date_from": date_from,
-                "p_date_to": date_to,
-                "p_user_role": user_role or "staff"
+                "p_date_to": date_to
             }
         ).execute()
         

@@ -202,13 +202,13 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
   }
 
   return (
-    <div className="glass-panel hidden h-full w-72 flex-shrink-0 flex-col overflow-hidden border-l border-border/60 lg:flex">
+    <div className="hidden h-full w-72 flex-shrink-0 flex-col overflow-hidden border-l border-neutral-200 bg-[#f7f7f8] dark:border-neutral-800 dark:bg-[#171717] lg:flex">
       {/* Header - ชื่อ + Model + Runtime แยกบรรทัด ไม่ให้บัง */}
-      <div className="flex shrink-0 flex-col gap-1 border-b border-border/70 bg-transparent p-3">
-        <h3 className="text-sm font-semibold text-foreground">สถานะการประมวลผล</h3>
+      <div className="flex shrink-0 flex-col gap-1 border-b border-neutral-200 p-3 dark:border-neutral-800">
+        <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">สถานะการประมวลผล</h3>
         {modelConfig && (
-          <p className="text-xs font-medium text-indigo-600">
-            Model: <span className="font-mono">{modelConfig.openai_model}</span>
+          <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            Model: <span className="font-mono text-neutral-800 dark:text-neutral-200">{modelConfig.openai_model}</span>
             <span className="ml-1 font-normal text-muted-foreground">({modelConfig.agents_count} agents)</span>
           </p>
         )}
@@ -228,12 +228,12 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
         {modelConfig && modelConfig.agents.length > 0 && (
           <div>
             <h4 className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agents และ Model</h4>
-            <div className="glass-panel rounded-lg border-indigo-200/70 p-2.5 dark:border-indigo-900/80">
+            <div className="rounded-lg border border-neutral-200 bg-white p-2.5 dark:border-neutral-700 dark:bg-neutral-900/50">
               <ul className="space-y-2">
                 {modelConfig.agents.map((agent, i) => (
                   <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-xs">
                     <span className="text-foreground">{agent.name}</span>
-                    <span className="shrink-0 font-mono text-indigo-600">{agent.model}</span>
+                    <span className="shrink-0 font-mono text-neutral-600 dark:text-neutral-300">{agent.model}</span>
                   </li>
                 ))}
               </ul>
@@ -244,7 +244,7 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
         {/* โหลด History */}
         <div>
           <h4 className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">โหลด History</h4>
-          <div className="glass-panel rounded-lg p-2.5">
+          <div className="rounded-lg border border-neutral-200 bg-white p-2.5 dark:border-neutral-700 dark:bg-neutral-900/50">
             <div className="flex items-center gap-2">
               {loadingHistory ? (
                 <>
@@ -271,12 +271,12 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
         <div>
           <h4 className="mb-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">สถานะการทำงาน</h4>
           {processSteps && processSteps.length > 0 ? (
-            <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-lg border border-border/70 bg-muted/30 p-1.5">
+            <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-lg border border-neutral-200 bg-neutral-100/80 p-1.5 dark:border-neutral-700 dark:bg-neutral-900/40">
               {processSteps.map((step, index) => (
                 <div
                   key={`${step.name}-${index}`}
-                  className={`glass-panel flex items-center gap-2 rounded border-white/25 px-2 py-1.5 transition-all ${
-                    step.status === 'processing' ? 'ring-1 ring-blue-200' : ''
+                  className={`flex items-center gap-2 rounded border border-neutral-200 bg-white px-2 py-1.5 transition-all dark:border-neutral-700 dark:bg-neutral-900/60 ${
+                    step.status === 'processing' ? 'ring-1 ring-neutral-400/50 dark:ring-neutral-500/40' : ''
                   }`}
                 >
                   {getStepIcon(step.status)}
@@ -300,8 +300,8 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
               ))}
             </div>
           ) : loading ? (
-            <div className="glass-panel flex items-center gap-2 rounded-lg px-2 py-1.5">
-              <div className="h-2 w-2 animate-pulse rounded-full bg-blue-600" />
+            <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-900/50">
+              <div className="h-2 w-2 animate-pulse rounded-full bg-neutral-500 dark:bg-neutral-400" />
               <p className="text-xs text-muted-foreground">กำลังประมวลผล...</p>
             </div>
           ) : (
@@ -341,7 +341,7 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
             <h4 className="mb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">ข้อมูลที่ดึงจากฟังก์ชัน</h4>
             <div className="space-y-3">
               {toolResults.map((result, index) => (
-                <div key={index} className="glass-panel overflow-hidden rounded-lg">
+                <div key={index} className="overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900/50">
                   {/* Tool Name */}
                   <div className="border-b border-border bg-muted/50 px-3 py-2">
                     <p className="text-xs font-semibold text-foreground">

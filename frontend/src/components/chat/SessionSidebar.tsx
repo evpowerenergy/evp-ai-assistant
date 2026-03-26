@@ -102,17 +102,17 @@ export function SessionSidebar({
       {/* Sidebar */}
       <div
         ref={sidebarRef}
-        className={`glass-panel-strong fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-[260px] transform border-r border-neutral-200 bg-[#f7f7f8] transition-transform duration-300 ease-in-out dark:border-neutral-800 dark:bg-[#171717] lg:relative lg:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <h2 className="text-lg font-semibold text-foreground">Chat Sessions</h2>
+          <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+            <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Chats</h2>
             <button
               onClick={onClose}
-              className="rounded-md p-1 text-muted-foreground hover:bg-muted lg:hidden"
+              className="rounded-md p-1 text-neutral-500 hover:bg-neutral-200/80 dark:text-neutral-400 dark:hover:bg-neutral-800 lg:hidden"
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -121,12 +121,12 @@ export function SessionSidebar({
           </div>
 
           {/* New Chat Button */}
-          <div className="border-b border-border px-4 py-3">
+          <div className="border-b border-neutral-200 px-3 py-3 dark:border-neutral-800">
             <button
               onClick={handleNewChat}
-              className="w-full rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm shadow-indigo-500/30 transition-all hover:-translate-y-0.5 hover:bg-indigo-700"
+              className="w-full rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-800 shadow-sm transition-colors hover:bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700/80"
             >
-              + New Chat
+              + New chat
             </button>
           </div>
 
@@ -143,8 +143,8 @@ export function SessionSidebar({
                     key={session.id}
                     className={`group flex items-start justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
                       currentSessionId === session.id
-                        ? 'bg-indigo-100/70 text-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-300'
-                        : 'text-muted-foreground hover:bg-white/40 hover:text-foreground dark:hover:bg-white/10'
+                        ? 'bg-neutral-200/90 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100'
+                        : 'text-neutral-600 hover:bg-neutral-200/60 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/80 dark:hover:text-neutral-100'
                     }`}
                   >
                     <div className="flex-1 min-w-0">
@@ -162,7 +162,7 @@ export function SessionSidebar({
                               cancelRenaming()
                             }
                           }}
-                          className="w-full rounded border border-indigo-300 bg-input px-2 py-1 text-sm text-foreground outline-none ring-2 ring-indigo-200"
+                          className="w-full rounded border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-900 outline-none ring-2 ring-neutral-200 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-700"
                         />
                       ) : (
                         <button

@@ -70,7 +70,7 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="flex h-full min-h-0 max-w-full overflow-hidden rounded-2xl border border-border/60 bg-transparent text-foreground">
+    <div className="flex h-full min-h-0 max-w-full overflow-hidden border-t-0 border-neutral-200/80 bg-transparent text-foreground dark:border-neutral-800">
       {/* Session Sidebar */}
       <SessionSidebar
         open={sidebarOpen}
@@ -86,23 +86,23 @@ export function ChatInterface() {
       {/* Main Chat Area - min-w-0 ให้ flex ลดขนาดได้ ไม่ดัน panel ออกจอ */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Header */}
-        <header className="flex flex-shrink-0 items-center justify-between gap-2 border-b border-border/70 bg-transparent px-4 py-2">
+        <header className="chat-thread-header flex flex-shrink-0 items-center justify-between gap-2 border-b border-neutral-200/90 bg-[#fafafa]/95 px-3 py-2 backdrop-blur-sm dark:border-neutral-800 dark:bg-[#212121]/95">
           <div className="flex min-w-0 items-center gap-2">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-muted lg:hidden"
+              className="shrink-0 rounded-lg p-2 text-neutral-500 hover:bg-neutral-200/80 dark:text-neutral-400 dark:hover:bg-neutral-800/80 lg:hidden"
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <h1 className="truncate text-lg font-semibold text-foreground">
+            <h1 className="truncate text-[15px] font-medium text-neutral-800 dark:text-neutral-100">
               {getHeaderSessionTitle(currentSession)}
             </h1>
           </div>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="hidden shrink-0 rounded-md p-2 text-muted-foreground hover:bg-muted lg:block"
+            className="hidden shrink-0 rounded-lg p-2 text-neutral-500 hover:bg-neutral-200/80 dark:text-neutral-400 dark:hover:bg-neutral-800/80 lg:block"
           >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -111,21 +111,21 @@ export function ChatInterface() {
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="chat-messages-scroll flex-1 overflow-y-auto bg-[#fafafa] dark:bg-[#212121]">
           {isLoadingHistory ? (
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
                 <div className="mb-2 flex justify-center">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div>
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-600 dark:border-neutral-700 dark:border-t-neutral-300"></div>
                 </div>
-                <p className="text-sm text-muted-foreground">กำลังโหลดประวัติการสนทนา...</p>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">กำลังโหลดประวัติการสนทนา...</p>
               </div>
             </div>
           ) : (
             <>
               <MessageList messages={messages} loading={loading} />
               {error && (
-                <div className="mx-4 mt-4 rounded-md bg-red-50/85 p-4 dark:bg-red-950/50">
+                <div className="mx-auto mt-4 max-w-3xl rounded-xl border border-red-200/80 bg-red-50/90 px-4 py-3 dark:border-red-900/60 dark:bg-red-950/40">
                   <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
                 </div>
               )}

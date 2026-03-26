@@ -18,7 +18,14 @@ DATA_KEYWORDS_LEADS = (
     "รอรับ", "กำลังติดตาม", "ปิดการขาย", "ยังปิดการขายไม่สำเร็จ",
 )
 DATA_KEYWORDS_APPOINTMENTS = ("นัด", "appointment", "นัดหมาย", "นัดช่าง", "นัดติดตาม", "นัดชำระเงิน")
-DATA_KEYWORDS_TEAM_KPI = ("ทีมขาย", "ทีม", "team", "kpi", "สถิติ", "dashboard", "แดชบอร์ด", "พนักงานขาย", "เซลล์")
+DATA_KEYWORDS_TEAM_KPI = ("ทีมขาย", "ทีม", "team", "kpi", "สถิติ", "dashboard", "แดชบอร์ด", "พนักงานขาย")
+DATA_KEYWORDS_SALES_BY_MEMBER = (
+    # Revenue/sales amount requested per member
+    "ยอดขายของเซลล์", "ยอดขายรายเซลล์", "ยอดขายรายคน", "ยอดขายของแต่ละคน",
+    "ยอดขายของพนักงานขาย", "ขายได้กี่บาท", "บาทของเซลล์",
+    # Common tokens used in Thai queries
+    "เซลล์", "พนักงานขาย", "แต่ละคน", "รายคน", "รายเซลล์"
+)
 DATA_KEYWORDS_SALES_CLOSED = (
     "ยอดขายที่ปิด", "ยอดขายวันนี้", "ยอดขาย", "sales closed", "ปิดการขายแล้ว", "ยอดแยกรายเดือน", "ยอดรายเดือน",
     "package", "wholesales", "แพ็กเกจ", "โฮลเซล", "แยก package", "แยก wholesales", "แยกรายการ",
@@ -55,6 +62,9 @@ def _suggest_default_tool_for_data_request(user_message: str) -> Optional[Dict[s
     # More specific intents first (ปิดไม่ได้ ต้องก่อน LEADS เพื่อไม่ไป search_leads)
     if any(k in m for k in DATA_KEYWORDS_SALES_UNSUCCESSFUL):
         return {"name": "get_sales_unsuccessful", "parameters": {}}
+    # Revenue/sales per member -> get_sales_team_data (avoid mistakenly routing to KPI tool)
+    if any(k in m for k in ("ยอดขาย", "ขายได้", "บาท")) and any(k in m for k in DATA_KEYWORDS_SALES_BY_MEMBER):
+        return {"name": "get_sales_team_data", "parameters": {}}
     if any(k in m for k in DATA_KEYWORDS_SALES_CLOSED):
         return {"name": "get_sales_closed", "parameters": {}}
     if any(k in m for k in DATA_KEYWORDS_APPOINTMENTS):
@@ -202,7 +212,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "get_team_kpi",
-            "description": "Get team KPI and performance metrics with per-member statistics (currentLeads, totalLeads, closedLeads, conversionRate, contactRate). Use when user asks about team performance, KPI, or conversion rates.",
+            "description": "Get team performance KPI metrics (leads + conversion/contact rates) with per-member statistics (currentLeads, totalLeads, closedLeads, conversionRate, contactRate). Use for KPI/conversion questions, NOT for sales revenue (บาท) or closed-sales value.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -352,7 +362,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "get_sales_team_data",
-            "description": "Get sales team data with detailed metrics (deals_closed, pipeline_value, conversion_rate) and data (leads, quotations). Use when user asks about sales team with detailed data or pipeline value (e.g., 'ข้อมูลทีมขายพร้อม leads', 'ทีมขายและ deals', 'มูลค่าพอร์ตของทีม').",
+            "description": "Get sales team closed-deals revenue/performance with detailed metrics (deals_closed (QT), pipeline_value (บาท), conversion_rate) and data (leads, quotations). Use when user asks about 'ยอดขายของเซลล์/พนักงานขายแต่ละคน (บาท)', 'ปิดการขายได้กี่ดีล/ยอดปิดเป็นบาท', or similar revenue-by-member questions.",
             "parameters": {
                 "type": "object",
                 "properties": {

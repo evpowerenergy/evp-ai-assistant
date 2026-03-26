@@ -22,10 +22,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-3xl rounded-lg px-4 py-3 ${
+        className={`max-w-[min(100%,42rem)] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
           isUser
-            ? 'bg-indigo-600 text-white'
-            : 'glass-panel border-white/30 text-foreground'
+            ? 'border border-emerald-200/80 bg-emerald-50 text-neutral-900 shadow-sm dark:border-emerald-800/50 dark:bg-emerald-950/35 dark:text-emerald-50'
+            : 'border-l-2 border-emerald-600/45 bg-transparent pl-4 text-neutral-800 dark:border-emerald-500/35 dark:text-neutral-100'
         }`}
         style={{ 
           wordWrap: 'break-word',
