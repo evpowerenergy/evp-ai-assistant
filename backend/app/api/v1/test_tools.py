@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from app.core.auth import get_current_user
 from app.tools.db_tools import (
-    get_lead_status,
     get_daily_summary,
     search_leads,
     get_customer_info,
@@ -53,11 +52,11 @@ async def test_tools(
         }
     }
     
-    3. Test get_lead_status:
+    3. Test get_customer_info:
     {
-        "tool_name": "get_lead_status",
+        "tool_name": "get_customer_info",
         "parameters": {
-            "lead_name": "test lead"
+            "customer_name": "test customer"
         }
     }
     """
@@ -89,12 +88,6 @@ async def test_tools(
                 user_role=request.parameters.get("user_role", user_role)
             )
         
-        elif request.tool_name == "get_lead_status":
-            lead_name = request.parameters.get("lead_name", "")
-            if not lead_name:
-                raise HTTPException(status_code=400, detail="lead_name is required")
-            result = await get_lead_status(lead_name, user_id)
-        
         elif request.tool_name == "get_customer_info":
             customer_name = request.parameters.get("customer_name", "")
             if not customer_name:
@@ -108,7 +101,7 @@ async def test_tools(
         else:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unknown tool: {request.tool_name}. Available: search_leads, get_daily_summary, get_lead_status, get_customer_info, get_team_kpi"
+                detail=f"Unknown tool: {request.tool_name}. Available: search_leads, get_daily_summary, get_customer_info, get_team_kpi"
             )
         
         logger.info(f"✅ Tool executed successfully")
@@ -163,19 +156,6 @@ async def list_available_tools():
                 "parameters": {
                     "date": "2026-01-17",
                     "user_role": "admin"
-                }
-            }
-        },
-        {
-            "name": "get_lead_status",
-            "description": "Get status of a specific lead by name",
-            "parameters": {
-                "lead_name": "string (required) - Name of the lead"
-            },
-            "example": {
-                "tool_name": "get_lead_status",
-                "parameters": {
-                    "lead_name": "John Doe"
                 }
             }
         },

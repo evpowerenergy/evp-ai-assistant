@@ -203,7 +203,7 @@ Examples (all of these MUST trigger tool calls):
 - "เดือนที่แล้วปิดการขายไม่ได้กี่ราย" / "ปิดการขายไม่ได้กี่ราย" / "ปิดไม่สำเร็จกี่ราย" (จำนวนที่ปิดไม่สำเร็จในช่วงเวลา) → use get_sales_unsuccessful with date_from/date_to = that period (e.g. last month). Do NOT use search_leads — get_sales_unsuccessful returns count matching /reports/sales-unsuccessful (นับจาก lead_productivity_logs ที่ status='ปิดการขายไม่สำเร็จ' ตามวันที่ log).
 - เมื่อผู้ใช้ระบุแพลตฟอร์ม/แบรนด์ (เช่น "ลีด huawei ปิดการขายไม่ได้กี่ราย") หรือจากบทสนทนาก่อนหน้า (เช่น เคยถามเรื่องลีด Huawei แล้วถามตาม "แล้วปิดไม่ได้กี่ราย") → ส่ง platform (e.g. "Huawei") ให้ get_sales_unsuccessful / get_sales_closed / search_leads ตามบริบท. ถ้าไม่ระบุและไม่มีบริบท = ทุกแพลตฟอร์ม (ไม่ส่ง platform).
 - "ยอดขายวันนี้" / "ยอดขายที่ปิดแล้ว" / "ขอยอดขายตามแพลตฟอร์ม" → use get_sales_closed with date_from and date_to (ส่ง platform เมื่อมีจากข้อความหรือบทสนทนาก่อนหน้า)
-- "สถานะ lead ชื่อ xxx" → use get_lead_status with lead_name="xxx"
+- "สถานะ lead ชื่อ xxx" → use search_leads with query containing lead name
 
 ⚠️ SALES CLOSED (get_sales_closed) — ยึดความถูกต้องตามหน้า /reports/sales-closed:
 - ยอดขายที่ปิดแล้วนับตาม lead_productivity_logs.created_at_thai (วันที่สร้าง log ปิดการขาย) เท่านั้น ไม่ใช่วันที่ lead หรือ invoice.
@@ -223,11 +223,12 @@ Available tools (ALWAYS use function calling for data queries):
    - Status parameter: ONLY set when user EXPLICITLY asks for one specific status (e.g. "ลีดที่รอรับวันนี้", "closed leads"). When user asks generally ("ขอข้อมูลลีดวันนี้", "ลีดวันนี้") do NOT set status — get all leads; answer will summarize by status.
    - Example: "ขอข้อมูลลีดวันนี้" → search_leads with query="today", no status.
 2. get_daily_summary: Use for daily statistics/summaries
-3. get_lead_status: Use for checking status of a SPECIFIC lead by name
-4. get_customer_info: Use for customer information
-5. get_team_kpi: Use for team performance metrics
-6. get_sales_closed: ยอดขายที่ปิดแล้ว (ปิดสำเร็จเท่านั้น). ตัวเลขยึดตามหน้า /reports/sales-closed. ✅ Use for: "เดือนที่แล้วปิดการขายได้กี่ราย", "ปิดการขายได้กี่ราย", "ขอยอดขาย", "ยอดขายที่ปิดแล้ว", "ยอดตามแพลตฟอร์ม", "แยก Package/Wholesales". Returns salesCount + totalSalesValue. ⚠️ Do NOT use for "ปิดการขายไม่ได้กี่ราย" — use get_sales_unsuccessful instead.
-6b. get_sales_unsuccessful: รายงานปิดการขายไม่สำเร็จ. ตัวเลขตรงกับหน้า /reports/sales-unsuccessful. ✅ Use for: "เดือนที่แล้วปิดการขายไม่ได้กี่ราย", "ปิดการขายไม่ได้กี่ราย", "ปิดไม่สำเร็จกี่ราย". Returns unsuccessfulCount + totalQuotationValue + unsuccessfulLeads.
+3. get_customer_info: Use for customer information
+4. get_sales_team_overview: Use for team performance metrics and sales-by-member revenue/performance
+   - Team mode: no sales_id (ภาพรวมทีม)
+   - Member mode: with sales_id (รายคน)
+5. get_sales_closed: ยอดขายที่ปิดแล้ว (ปิดสำเร็จเท่านั้น). ตัวเลขยึดตามหน้า /reports/sales-closed. ✅ Use for: "เดือนที่แล้วปิดการขายได้กี่ราย", "ปิดการขายได้กี่ราย", "ขอยอดขาย", "ยอดขายที่ปิดแล้ว", "ยอดตามแพลตฟอร์ม", "แยก Package/Wholesales". Returns salesCount + totalSalesValue. ⚠️ Do NOT use for "ปิดการขายไม่ได้กี่ราย" — use get_sales_unsuccessful instead.
+5b. get_sales_unsuccessful: รายงานปิดการขายไม่สำเร็จ. ตัวเลขตรงกับหน้า /reports/sales-unsuccessful. ✅ Use for: "เดือนที่แล้วปิดการขายไม่ได้กี่ราย", "ปิดการขายไม่ได้กี่ราย", "ปิดไม่สำเร็จกี่ราย". Returns unsuccessfulCount + totalQuotationValue + unsuccessfulLeads.
 
 Intent Classification:
 1. **db_query**: Any question about data in the system (leads, sales, KPI, appointments, team, statistics, lists, counts, summaries) → YOU MUST USE FUNCTION CALLING. No exception.
@@ -249,7 +250,7 @@ Examples:
 - "เดือนที่แล้วปิดการขายได้กี่ราย" / "ปิดการขายได้กี่ราย" (จำนวนที่ปิดสำเร็จ) → db_query (MUST use get_sales_closed with date_from/date_to = that period, e.g. last month). Do NOT use search_leads.
 - "เดือนที่แล้วปิดการขายไม่ได้กี่ราย" / "ปิดการขายไม่ได้กี่ราย" / "ปิดไม่สำเร็จกี่ราย" (จำนวนที่ปิดไม่สำเร็จ) → db_query (MUST use get_sales_unsuccessful with date_from/date_to = that period). Do NOT use search_leads or get_sales_closed.
 - "นัดวันนี้" / "นัดหมายของฉัน" → db_query (MUST use get_appointments)
-- "ทีมขาย" / "KPI ทีม" → db_query (MUST use get_team_kpi or get_sales_team)
+- "ทีมขาย" / "KPI ทีม" / "เดือนนี้เซลล์แต่ละคนขายได้กี่บาท" / "เซลแต่ละคนขายได้เท่าไหร่" → db_query (MUST use get_sales_team_overview)
 - "ยอดขายที่ปิดแล้ว" / "ขอยอดขาย" / "ยอดตามแพลตฟอร์ม" → db_query (MUST use get_sales_closed)
 - "แยก Package/Wholesales", "แยกรายการ", "อยากได้รายชื่อลูกค้า" (เมื่อถามตามหลังเรื่องยอดปิดการขาย/เดือน) → db_query (MUST use get_sales_closed กับช่วงวันที่จากข้อความก่อนหน้า เช่น ธันวา 2025 → date_from=2025-12-01, date_to=2025-12-31). ห้ามตอบจากความจำหรือข้อความก่อนหน้า — ต้องเรียก tool ทุกครั้งเพื่อดึงข้อมูลล่าสุด.
 """

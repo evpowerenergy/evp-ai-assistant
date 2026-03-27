@@ -129,17 +129,7 @@ def format_tool_response(
         output = result.get("output", {})
         inp = result.get("input", {})
 
-        if tool_name == "get_lead_status":
-            if output.get("found"):
-                responses.append(
-                    f"พบ lead: {output.get('display_name', output.get('full_name', 'N/A'))}\n"
-                    f"สถานะ: {output.get('status', 'N/A')}\n"
-                    f"หมวดหมู่: {output.get('category', 'N/A')}"
-                )
-            else:
-                responses.append("ไม่พบ lead ที่ต้องการ")
-
-        elif tool_name == "search_leads":
+        if tool_name == "search_leads":
             if output.get("success") and output.get("data"):
                 sales_leads = output.get("data", {}).get("salesLeads", [])
                 if sales_leads and len(sales_leads) > 0:
@@ -540,39 +530,6 @@ def format_tool_response(
             else:
                 responses.append("ไม่พบข้อมูลทีมขาย")
 
-        elif tool_name == "get_my_leads":
-            if output.get("success") and output.get("data"):
-                leads = output.get("data", {}).get("leads", [])
-                stats = output.get("stats", {})
-
-                if leads and len(leads) > 0:
-                    lead_list = []
-                    for i, lead in enumerate(leads, 1):
-                        name = lead.get("display_name") or lead.get("full_name", "N/A")
-                        tel = lead.get("tel", "")
-                        status = lead.get("status", "N/A")
-                        category = lead.get("category", "")
-
-                        lead_info = f"{i}. {name}"
-                        if category:
-                            lead_info += f" ({category})"
-                        if status:
-                            lead_info += f" - สถานะ: {status}"
-                        if tel:
-                            lead_info += f" - โทร: {tel}"
-
-                        lead_list.append(lead_info)
-
-                    total = stats.get("totalLeads", len(leads))
-                    result_text = "\n".join(lead_list)
-                    responses.append(f"พบ {total} ลีดที่ assign ให้คุณ:\n{result_text}")
-                else:
-                    responses.append("ไม่พบลีดที่ assign ให้คุณ")
-            elif output.get("error"):
-                responses.append(f"เกิดข้อผิดพลาด: {output.get('error')}")
-            else:
-                responses.append("ไม่พบข้อมูลลีดของคุณ")
-
         elif tool_name == "get_lead_detail":
             if output.get("success") and output.get("data"):
                 lead = output.get("data", {}).get("lead", {})
@@ -626,62 +583,90 @@ def format_tool_response(
             else:
                 responses.append("ไม่พบข้อมูลนัดหมาย")
 
-        elif tool_name == "get_sales_team_data":
+        elif tool_name in ["get_sales_team_overview", "get_sales_team_data", "get_team_kpi", "get_sales_team", "get_sales_performance"]:
             if output.get("success") and output.get("data"):
-                sales_team = output.get("data", {}).get("salesTeam", [])
+                data = output.get("data", {})
+                sales_team = data.get("salesTeam", [])
+
+                # Single-member mode payload (from get_sales_performance)
+                if (not sales_team) and isinstance(data, dict) and any(k in data for k in ["deals_closed", "pipeline_value", "conversion_rate", "total_leads"]):
+                    name = data.get("name", "N/A")
+                    total_leads = data.get("total_leads", 0)
+                    deals_closed = data.get("deals_closed", 0)
+                    pipeline_value = data.get("pipeline_value", 0)
+                    conversion_rate = data.get("conversion_rate", 0)
+                    try:
+                        pipeline_value_num = float(pipeline_value or 0)
+                    except (TypeError, ValueError):
+                        pipeline_value_num = 0.0
+                    try:
+                        conversion_rate_num = float(conversion_rate or 0)
+                    except (TypeError, ValueError):
+                        conversion_rate_num = 0.0
+                    responses.append(
+                        "สรุปผลงานรายเซล\n"
+                        f"- ชื่อ: {name}\n"
+                        f"- ลีดทั้งหมด: {int(total_leads or 0)}\n"
+                        f"- ปิดการขาย: {int(deals_closed or 0)} ดีล\n"
+                        f"- ยอดขาย: {pipeline_value_num:,.2f} บาท\n"
+                        f"- Conversion Rate: {conversion_rate_num:.2f}%"
+                    )
+                    continue
 
                 if sales_team and len(sales_team) > 0:
+                    date_from = inp.get("date_from")
+                    date_to = inp.get("date_to")
                     team_list = []
+                    total_amount = 0.0
                     for i, member in enumerate(sales_team, 1):
                         name = member.get("name", "N/A")
-                        deals_closed = member.get("deals_closed", 0)
-                        pipeline_value = member.get("pipeline_value", 0)
-                        conversion_rate = member.get("conversion_rate", 0)
+                        # Support both snake_case and camelCase in case RPC payload changes.
+                        deals_closed = (
+                            member.get("deals_closed")
+                            if member.get("deals_closed") is not None
+                            else member.get("dealsClosed", 0)
+                        )
+                        pipeline_value = (
+                            member.get("pipeline_value")
+                            if member.get("pipeline_value") is not None
+                            else member.get("pipelineValue", 0)
+                        )
+                        conversion_rate = (
+                            member.get("conversion_rate")
+                            if member.get("conversion_rate") is not None
+                            else member.get("conversionRate", 0)
+                        )
+
+                        try:
+                            pipeline_value_num = float(pipeline_value or 0)
+                        except (TypeError, ValueError):
+                            pipeline_value_num = 0.0
+                        total_amount += pipeline_value_num
 
                         member_info = f"{i}. {name}"
-                        member_info += f" - Deals Closed: {deals_closed}"
-                        member_info += f" - Pipeline Value: {pipeline_value:,.0f}"
+                        member_info += f" - ปิดการขาย {int(deals_closed or 0)} ดีล"
+                        member_info += f" - ยอดขาย {pipeline_value_num:,.2f} บาท"
                         if conversion_rate:
-                            member_info += f" - Conversion Rate: {conversion_rate:.2f}%"
+                            try:
+                                member_info += f" - Conversion Rate: {float(conversion_rate):.2f}%"
+                            except (TypeError, ValueError):
+                                pass
 
                         team_list.append(member_info)
 
                     total = len(sales_team)
                     result_text = "\n".join(team_list)
-                    responses.append(f"พบ {total} รายชื่อทีมขายพร้อมข้อมูล:\n{result_text}")
+                    header = f"สรุปยอดขายรายเซล: {total} คน"
+                    if date_from and date_to:
+                        header += f" (ช่วง {date_from} ถึง {date_to})"
+                    header += f"\nยอดขายรวมทั้งทีม: {total_amount:,.2f} บาท"
+                    responses.append(f"{header}\n\n{result_text}")
                 else:
                     responses.append("ไม่พบรายชื่อทีมขาย")
             elif output.get("error"):
                 responses.append(f"เกิดข้อผิดพลาด: {output.get('error')}")
             else:
                 responses.append("ไม่พบข้อมูลทีมขาย")
-
-        elif tool_name == "get_lead_management":
-            if output.get("success") and output.get("data"):
-                leads = output.get("data", {}).get("leads", [])
-                stats = output.get("data", {}).get("stats", {})
-
-                if leads and len(leads) > 0:
-                    lead_list = []
-                    for i, lead in enumerate(leads, 1):
-                        name = lead.get("display_name") or lead.get("full_name", "N/A")
-                        status = lead.get("status", "N/A")
-                        lead_info = f"{i}. {name} - สถานะ: {status}"
-                        lead_list.append(lead_info)
-
-                    total = stats.get("totalLeads", len(leads))
-                    assigned = stats.get("assignedLeads", 0)
-                    unassigned = stats.get("unassignedLeads", 0)
-
-                    result_text = "\n".join(lead_list)
-                    stats_text = f"\nสถิติ: ทั้งหมด {total}, Assign แล้ว {assigned}, ยังไม่ได้ assign {unassigned}"
-                    responses.append(f"พบ {total} ลีด:\n{result_text}{stats_text}")
-                else:
-                    responses.append("ไม่พบลีด")
-            elif output.get("error"):
-                responses.append(f"เกิดข้อผิดพลาด: {output.get('error')}")
-            else:
-                responses.append("ไม่พบข้อมูล Lead Management")
 
         elif tool_name == "get_service_appointments":
             if output.get("success") and output.get("data"):
@@ -718,10 +703,36 @@ def format_tool_response(
             else:
                 responses.append("ไม่พบข้อมูลประสิทธิภาพการขาย")
 
-        elif tool_name in ["get_sales_docs", "get_quotations", "get_permit_requests", "get_user_info"]:
+        elif tool_name in ["get_sales_docs", "get_permit_requests"]:
             if output.get("success"):
                 data = output.get("data", {})
-                if isinstance(data, list) and len(data) > 0:
+                if tool_name == "get_sales_docs" and isinstance(data, dict):
+                    docs = data.get("sales_docs", []) if isinstance(data.get("sales_docs", []), list) else []
+                    if docs:
+                        lines = []
+                        for i, d in enumerate(docs[:10], 1):
+                            doc_no = d.get("doc_number", "N/A")
+                            doc_type = d.get("doc_type", "N/A")
+                            amount = float(d.get("total_amount") or 0)
+                            doc_date = d.get("doc_date", "")
+                            customer_name = d.get("customer_name")
+                            sale_name = d.get("sale_name")
+                            lead_status = d.get("lead_status")
+                            line = f"{i}. {doc_no} ({doc_type}) - ฿{amount:,.2f}"
+                            if doc_date:
+                                line += f" - วันที่ {doc_date}"
+                            if customer_name:
+                                line += f"\n   ลูกค้า: {customer_name}"
+                            if sale_name:
+                                line += f"\n   เซลล์ผู้รับผิดชอบ: {sale_name}"
+                            if lead_status:
+                                line += f"\n   สถานะลูกค้าปัจจุบัน: {lead_status}"
+                            lines.append(line)
+                        more = f"\nและอีก {len(docs) - 10} รายการ" if len(docs) > 10 else ""
+                        responses.append(f"พบเอกสารการขาย {len(docs)} รายการ\n" + "\n".join(lines) + more)
+                    else:
+                        responses.append("ไม่พบเอกสารการขายที่ตรงเงื่อนไข")
+                elif isinstance(data, list) and len(data) > 0:
                     responses.append(f"พบข้อมูล: {len(data)} รายการ")
                 elif isinstance(data, dict) and data:
                     responses.append("พบข้อมูล")

@@ -39,7 +39,7 @@ async def rpc_planner_node(state: AIAssistantState) -> AIAssistantState:
                 # Apply suggested adjustments
                 if "query" in suggested_retry_params:
                     # Update query for search tools
-                    if tool_name in ["search_leads", "get_lead_status", "get_customer_info"]:
+                    if tool_name in ["search_leads", "get_customer_info"]:
                         new_query = suggested_retry_params.get("query")
                         if new_query:
                             params["query"] = new_query

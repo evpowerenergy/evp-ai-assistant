@@ -296,33 +296,6 @@ async def get_sales_unsuccessful(
         return {"success": False, "error": str(e)}
 
 
-async def get_lead_status(lead_name: str, user_id: str) -> Dict[str, Any]:
-    """
-    Get lead status via RPC
-    RPC: ai_get_lead_status(lead_name, user_id)
-    """
-    try:
-        supabase = get_supabase_client()
-        
-        result = supabase.rpc(
-            "ai_get_lead_status",
-            {
-                "p_lead_name": lead_name,
-                "p_user_id": user_id
-            }
-        ).execute()
-        
-        logger.info(f"   📞 Calling RPC: ai_get_lead_status")
-        logger.info(f"   Parameters: lead_name={lead_name}, user_id={user_id}")
-        db_result = result.data if result.data else {}
-        logger.info(f"   📥 RPC Response: {db_result}")
-        return db_result
-    
-    except Exception as e:
-        logger.error(f"RPC error (ai_get_lead_status): {e}")
-        return {"error": str(e)}
-
-
 async def get_daily_summary(user_id: str, date: Optional[str] = None, user_role: Optional[str] = None) -> Dict[str, Any]:
     """
     Get daily summary via RPC
@@ -690,6 +663,9 @@ async def get_service_appointments(
 async def get_sales_docs(
     user_id: str,
     filters: Optional[Dict[str, Any]] = None,
+    query: Optional[str] = None,
+    document_number: Optional[str] = None,
+    doc_type: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     limit: int = 100
@@ -700,56 +676,230 @@ async def get_sales_docs(
     """
     try:
         supabase = get_supabase_client()
-        
+        # Post-filter by document number when user asks a specific QT/INV/BL id.
+        # ai_get_sales_docs currently does not provide document_number filter in SQL.
+        target_doc = (document_number or "").strip()
+        if not target_doc and query:
+            m = re.search(r"([A-Za-z]{2,5}\d{6,})", str(query), flags=re.IGNORECASE)
+            if m:
+                target_doc = m.group(1)
+
+        # ai_get_sales_docs currently has a DB-side type mismatch on doc_type filter.
+        # For QT queries, use dedicated ai_get_quotations and normalize response shape.
+        wants_qt = bool(
+            (doc_type and str(doc_type).strip().upper() == "QT")
+            or (target_doc and target_doc.strip().upper().startswith("QT"))
+            or ("qt" in str(query or "").lower())
+            or ("quotation" in str(query or "").lower())
+            or ("ใบเสนอราคา" in str(query or ""))
+        )
+        if wants_qt:
+            # Prefer RPC-first for stable response contract and DB-side execution.
+            # Fallback to direct table query if the new RPC is unavailable.
+            try:
+                rpc_result = supabase.rpc(
+                    "ai_get_qt_doc_detail",
+                    {
+                        "p_user_id": user_id,
+                        "p_document_number": target_doc if target_doc else None,
+                        "p_date_from": date_from,
+                        "p_date_to": date_to,
+                        "p_limit": limit,
+                    },
+                ).execute()
+                rpc_payload = rpc_result.data if rpc_result.data else {}
+                if isinstance(rpc_payload, dict) and rpc_payload.get("success"):
+                    logger.info(
+                        f"RPC: ai_get_qt_doc_detail, doc_number={target_doc or '-'}"
+                    )
+                    return rpc_payload
+            except Exception as rpc_exc:
+                logger.warning(
+                    f"RPC ai_get_qt_doc_detail unavailable/failed, fallback to table query. details={rpc_exc}"
+                )
+
+            # Robust QT detail path: query quotation_documents directly and enrich
+            # with lead/productivity/sales owner context.
+            try:
+                qd_query = supabase.table("quotation_documents").select(
+                    "id,document_number,amount,productivity_log_id,document_type,created_at_thai"
+                )
+                if target_doc:
+                    qd_query = qd_query.ilike("document_number", f"%{target_doc}%")
+                qd_rows_res = qd_query.limit(max(limit, 200)).execute()
+                qd_rows = list(qd_rows_res.data or [])
+            except Exception:
+                # Some environments may not have created_at_thai on quotation_documents.
+                qd_query = supabase.table("quotation_documents").select(
+                    "id,document_number,amount,productivity_log_id,document_type"
+                )
+                if target_doc:
+                    qd_query = qd_query.ilike("document_number", f"%{target_doc}%")
+                qd_rows_res = qd_query.limit(max(limit, 200)).execute()
+                qd_rows = list(qd_rows_res.data or [])
+
+            # Keep only quotation/QT docs and exact target when available
+            qd_filtered = []
+            for r in qd_rows:
+                if not isinstance(r, dict):
+                    continue
+                doc_type_raw = str(r.get("document_type", "")).strip().lower()
+                if doc_type_raw and doc_type_raw not in ["quotation", "qt"]:
+                    continue
+                if target_doc:
+                    dn = str(r.get("document_number", "")).strip().lower()
+                    td = target_doc.lower()
+                    if dn != td and td not in dn:
+                        continue
+                qd_filtered.append(r)
+
+            log_ids = [r.get("productivity_log_id") for r in qd_filtered if r.get("productivity_log_id") is not None]
+            logs_by_id: Dict[int, Dict[str, Any]] = {}
+            leads_by_id: Dict[int, Dict[str, Any]] = {}
+            sales_by_id: Dict[int, Dict[str, Any]] = {}
+
+            if log_ids:
+                logs_res = supabase.table("lead_productivity_logs").select(
+                    "id,lead_id,sale_id,status,created_at_thai"
+                ).in_("id", log_ids).execute()
+                for row in (logs_res.data or []):
+                    if isinstance(row, dict) and row.get("id") is not None:
+                        logs_by_id[int(row["id"])] = row
+
+            lead_ids = [
+                int(v.get("lead_id"))
+                for v in logs_by_id.values()
+                if v.get("lead_id") is not None
+            ]
+            if lead_ids:
+                leads_res = supabase.table("leads").select(
+                    "id,display_name,full_name,status,sale_owner_id,post_sales_owner_id"
+                ).in_("id", lead_ids).execute()
+                for row in (leads_res.data or []):
+                    if isinstance(row, dict) and row.get("id") is not None:
+                        leads_by_id[int(row["id"])] = row
+
+            sale_ids = {
+                int(v.get("sale_id"))
+                for v in logs_by_id.values()
+                if v.get("sale_id") is not None
+            }
+            if sale_ids:
+                try:
+                    sales_res = supabase.table("sales_team_with_user_info").select(
+                        "id,name,first_name,last_name,email,phone"
+                    ).in_("id", list(sale_ids)).execute()
+                except Exception:
+                    # Some environments expose only a subset of columns on this view.
+                    try:
+                        sales_res = supabase.table("sales_team_with_user_info").select(
+                            "id,name,email,phone"
+                        ).in_("id", list(sale_ids)).execute()
+                    except Exception:
+                        sales_res = supabase.table("sales_team_with_user_info").select(
+                            "id,name"
+                        ).in_("id", list(sale_ids)).execute()
+                for row in (sales_res.data or []):
+                    if isinstance(row, dict) and row.get("id") is not None:
+                        sales_by_id[int(row["id"])] = row
+
+            sales_docs = []
+            for r in qd_filtered:
+                log = logs_by_id.get(int(r.get("productivity_log_id") or 0), {})
+                lead = leads_by_id.get(int(log.get("lead_id") or 0), {})
+                sale = sales_by_id.get(int(log.get("sale_id") or 0), {})
+                sale_name = (
+                    sale.get("name")
+                    or " ".join([str(sale.get("first_name") or "").strip(), str(sale.get("last_name") or "").strip()]).strip()
+                    or None
+                )
+                customer_name = lead.get("display_name") or lead.get("full_name")
+                sales_docs.append(
+                    {
+                        "id": r.get("id"),
+                        "doc_number": r.get("document_number"),
+                        "doc_type": "QT",
+                        "doc_date": r.get("created_at_thai") or log.get("created_at_thai"),
+                        "total_amount": r.get("amount") or 0,
+                        "lead_id": log.get("lead_id"),
+                        "customer_name": customer_name,
+                        "lead_status": lead.get("status"),
+                        "sale_id": log.get("sale_id"),
+                        "sale_name": sale_name,
+                        "sale_email": sale.get("email"),
+                        "sale_phone": sale.get("phone"),
+                        "productivity_log_id": r.get("productivity_log_id"),
+                        "source": "quotation_documents",
+                    }
+                )
+            payload = {
+                "success": True,
+                "data": {
+                    "sales_docs": sales_docs,
+                    "stats": {
+                        "returned": len(sales_docs),
+                        "source_total": len(qd_rows),
+                    },
+                },
+                "meta": {
+                    "source_rpc": "quotation_documents",
+                    "document_number_filter": target_doc or None,
+                    "doc_type_filter": "QT",
+                    "date_from": date_from,
+                    "date_to": date_to,
+                },
+            }
+            logger.info(
+                f"QT detail query via quotation_documents, doc_number={target_doc or '-'}, matched={len(sales_docs)}"
+            )
+            return payload
+
+        rpc_filters = (filters or {}).copy()
         result = supabase.rpc(
             "ai_get_sales_docs",
             {
                 "p_user_id": user_id,
-                "p_filters": filters or {},
+                "p_filters": rpc_filters,
                 "p_date_from": date_from,
                 "p_date_to": date_to,
                 "p_limit": limit
             }
         ).execute()
-        
+        payload = result.data if result.data else {}
+        if isinstance(payload, dict):
+            docs = list(((payload.get("data") or {}).get("sales_docs") or []))
+            filtered = docs
+
+            # Apply doc_type filter in Python to avoid DB type mismatch
+            if doc_type:
+                doc_type_u = str(doc_type).strip().upper()
+                filtered = [d for d in filtered if str(d.get("doc_type", "")).strip().upper() == doc_type_u]
+
+            if target_doc:
+                target_doc_l = target_doc.lower()
+                filtered_exact = [d for d in filtered if str(d.get("doc_number", "")).lower() == target_doc_l]
+                filtered = filtered_exact if filtered_exact else [d for d in filtered if target_doc_l in str(d.get("doc_number", "")).lower()]
+
+            # If any post-filter was applied, write filtered result back
+            if doc_type or target_doc:
+                payload.setdefault("data", {})
+                payload["data"]["sales_docs"] = filtered
+                payload.setdefault("meta", {})
+                if target_doc:
+                    payload["meta"]["document_number_filter"] = target_doc
+                if doc_type:
+                    payload["meta"]["doc_type_filter"] = doc_type
+                if isinstance(payload["data"].get("stats"), dict):
+                    payload["data"]["stats"]["returned"] = len(filtered)
+                logger.info(
+                    f"RPC: ai_get_sales_docs post-filter doc_type={doc_type or '-'} doc_number={target_doc or '-'} matched={len(filtered)}"
+                )
+
         logger.info(f"RPC: ai_get_sales_docs, user={user_id}")
-        return result.data if result.data else {}
+        return payload
     
     except Exception as e:
         logger.error(f"RPC error (ai_get_sales_docs): {e}")
-        return {"error": str(e)}
-
-
-async def get_quotations(
-    user_id: str,
-    filters: Optional[Dict[str, Any]] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    limit: int = 100
-) -> Dict[str, Any]:
-    """
-    Get quotations via RPC (dedicated function)
-    RPC: ai_get_quotations(user_id, filters, date_from, date_to, limit)
-    """
-    try:
-        supabase = get_supabase_client()
-        
-        result = supabase.rpc(
-            "ai_get_quotations",
-            {
-                "p_user_id": user_id,
-                "p_filters": filters or {},
-                "p_date_from": date_from,
-                "p_date_to": date_to,
-                "p_limit": limit
-            }
-        ).execute()
-        
-        logger.info(f"RPC: ai_get_quotations, user={user_id}")
-        return result.data if result.data else {}
-    
-    except Exception as e:
-        logger.error(f"RPC error (ai_get_quotations): {e}")
         return {"error": str(e)}
 
 
@@ -817,79 +967,6 @@ async def get_stock_movements(
     except Exception as e:
         logger.error(f"RPC error (ai_get_stock_movements): {e}")
         return {"error": str(e)}
-
-
-async def get_user_info(
-    user_id: str,
-    filters: Optional[Dict[str, Any]] = None,
-    limit: int = 100
-) -> Dict[str, Any]:
-    """
-    Get user information via RPC
-    RPC: ai_get_user_info(user_id, filters, limit)
-    """
-    try:
-        supabase = get_supabase_client()
-        
-        result = supabase.rpc(
-            "ai_get_user_info",
-            {
-                "p_user_id": user_id,
-                "p_filters": filters or {},
-                "p_limit": limit
-            }
-        ).execute()
-        
-        logger.info(f"RPC: ai_get_user_info, user={user_id}")
-        return result.data if result.data else {}
-    
-    except Exception as e:
-        logger.error(f"RPC error (ai_get_user_info): {e}")
-        return {"error": str(e)}
-
-
-# =============================================================================
-# Phase 2: New RPC Tools (Missing Functions)
-# =============================================================================
-
-async def get_my_leads(
-    user_id: str,
-    category: Optional[str] = "Package",
-    filters: Optional[Dict[str, Any]] = None,
-    user_role: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None
-) -> Dict[str, Any]:
-    """
-    Get leads assigned to current user via RPC
-    RPC: ai_get_my_leads(user_id, category, filters, date_from, date_to, user_role)
-    
-    Returns leads where user is sale_owner_id OR post_sales_owner_id
-    """
-    try:
-        supabase = get_supabase_client()
-        
-        result = supabase.rpc(
-            "ai_get_my_leads",
-            {
-                "p_user_id": user_id,
-                "p_category": category,
-                "p_filters": filters or {},
-                "p_date_from": date_from,
-                "p_date_to": date_to,
-                "p_user_role": user_role or "staff"
-            }
-        ).execute()
-        
-        logger.info(f"📞 Calling RPC: ai_get_my_leads")
-        logger.info(f"   Parameters: user_id={user_id}, category={category}, date_from={date_from}, date_to={date_to}")
-        db_result = result.data if result.data else {}
-        logger.info(f"   📥 RPC Response received")
-        return db_result
-    
-    except Exception as e:
-        logger.error(f"RPC error (ai_get_my_leads): {e}")
-        return {"error": str(e), "success": False}
 
 
 async def get_lead_detail(
@@ -1087,6 +1164,40 @@ async def get_sales_team_data(
         return {"error": str(e), "success": False}
 
 
+async def get_sales_team_overview(
+    user_id: str,
+    user_role: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    sales_id: Optional[int] = None,
+    period: str = "month",
+) -> Dict[str, Any]:
+    """
+    Consolidated Sales Team tool.
+    - Team view: delegates to get_sales_team_data (when sales_id is None)
+    - Single member view: delegates to get_sales_performance (when sales_id is provided)
+    """
+    try:
+        if sales_id is not None:
+            return await get_sales_performance(
+                sales_id=sales_id,
+                user_id=user_id,
+                user_role=user_role,
+                date_from=date_from,
+                date_to=date_to,
+                period=period,
+            )
+        return await get_sales_team_data(
+            user_id=user_id,
+            user_role=user_role,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except Exception as e:
+        logger.error(f"RPC error (get_sales_team_overview): {e}")
+        return {"error": str(e), "success": False}
+
+
 async def validate_phone(
     phone: str,
     user_id: Optional[str] = None,
@@ -1119,52 +1230,6 @@ async def validate_phone(
     except Exception as e:
         logger.error(f"RPC error (ai_validate_phone): {e}")
         return {"error": str(e), "success": False, "isDuplicate": False}
-
-
-async def get_lead_management(
-    user_id: str,
-    category: str = "Package",
-    include_user_data: bool = True,
-    include_sales_team: bool = True,
-    include_leads: bool = True,
-    user_role: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    limit: Optional[int] = None
-) -> Dict[str, Any]:
-    """
-    Get Lead Management page data via RPC
-    RPC: ai_get_lead_management(user_id, category, include_user_data, include_sales_team, include_leads, date_from, date_to, limit, user_role)
-    
-    Returns {leads, salesTeam, user, salesMember, stats}
-    """
-    try:
-        supabase = get_supabase_client()
-        
-        result = supabase.rpc(
-            "ai_get_lead_management",
-            {
-                "p_user_id": user_id,
-                "p_category": category,
-                "p_include_user_data": include_user_data,
-                "p_include_sales_team": include_sales_team,
-                "p_include_leads": include_leads,
-                "p_date_from": date_from,
-                "p_date_to": date_to,
-                "p_limit": limit,
-                "p_user_role": user_role or "staff"
-            }
-        ).execute()
-        
-        logger.info(f"📞 Calling RPC: ai_get_lead_management")
-        logger.info(f"   Parameters: user_id={user_id}, category={category}, date_from={date_from}, date_to={date_to}")
-        db_result = result.data if result.data else {}
-        logger.info(f"   📥 RPC Response received")
-        return db_result
-    
-    except Exception as e:
-        logger.error(f"RPC error (ai_get_lead_management): {e}")
-        return {"error": str(e), "success": False}
 
 
 async def get_sales_performance(

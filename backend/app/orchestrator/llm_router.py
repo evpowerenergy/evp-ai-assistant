@@ -2,6 +2,7 @@
 LLM-based Intent Router with Function Calling
 Uses LLM to analyze intent and select tools
 """
+import re
 from typing import Dict, Any, List, Optional
 
 from openai import AsyncOpenAI  # type: ignore[reportMissingImports]
@@ -24,7 +25,7 @@ DATA_KEYWORDS_SALES_BY_MEMBER = (
     "ยอดขายของเซลล์", "ยอดขายรายเซลล์", "ยอดขายรายคน", "ยอดขายของแต่ละคน",
     "ยอดขายของพนักงานขาย", "ขายได้กี่บาท", "บาทของเซลล์",
     # Common tokens used in Thai queries
-    "เซลล์", "พนักงานขาย", "แต่ละคน", "รายคน", "รายเซลล์"
+    "เซลล์", "เซล", "พนักงานขาย", "แต่ละคน", "รายคน", "รายเซลล์"
 )
 DATA_KEYWORDS_SALES_CLOSED = (
     "ยอดขายที่ปิด", "ยอดขายวันนี้", "ยอดขาย", "sales closed", "ปิดการขายแล้ว", "ยอดแยกรายเดือน", "ยอดรายเดือน",
@@ -37,12 +38,13 @@ DATA_KEYWORDS_SALES_UNSUCCESSFUL = (
     "ปิดการขายไม่ได้", "ปิดไม่ได้", "ปิดไม่สำเร็จ", "ปิดไม่สำเร็จกี่ราย",
     "เดือนที่แล้วปิดไม่ได้", "กี่รายที่ปิดไม่ได้",
 )
-DATA_KEYWORDS_QUOTATIONS = ("ใบเสนอราคา", "quotation", "โควต้า", "quotations")
+DATA_KEYWORDS_QUOTATIONS = ("ใบเสนอราคา", "quotation", "โควต้า", "quotations", "qt", "ใบ qt")
 DATA_KEYWORDS_DOCS = ("เอกสารการขาย", "ใบแจ้งหนี้", "invoice", "เอกสาร")
 DATA_KEYWORDS_PERMITS = ("คำขออนุญาต", "permit", "อนุญาต")
 # Union of all data-related keywords for "any match" check
 _DATA_KEYWORDS_ALL = (
     DATA_KEYWORDS_LEADS + DATA_KEYWORDS_APPOINTMENTS + DATA_KEYWORDS_TEAM_KPI
+    + DATA_KEYWORDS_SALES_BY_MEMBER
     + DATA_KEYWORDS_SALES_CLOSED + DATA_KEYWORDS_SALES_UNSUCCESSFUL
     + DATA_KEYWORDS_QUOTATIONS + DATA_KEYWORDS_DOCS + DATA_KEYWORDS_PERMITS
 )
@@ -62,17 +64,17 @@ def _suggest_default_tool_for_data_request(user_message: str) -> Optional[Dict[s
     # More specific intents first (ปิดไม่ได้ ต้องก่อน LEADS เพื่อไม่ไป search_leads)
     if any(k in m for k in DATA_KEYWORDS_SALES_UNSUCCESSFUL):
         return {"name": "get_sales_unsuccessful", "parameters": {}}
-    # Revenue/sales per member -> get_sales_team_data (avoid mistakenly routing to KPI tool)
+    # Revenue/sales per member -> consolidated sales team overview
     if any(k in m for k in ("ยอดขาย", "ขายได้", "บาท")) and any(k in m for k in DATA_KEYWORDS_SALES_BY_MEMBER):
-        return {"name": "get_sales_team_data", "parameters": {}}
+        return {"name": "get_sales_team_overview", "parameters": {}}
     if any(k in m for k in DATA_KEYWORDS_SALES_CLOSED):
         return {"name": "get_sales_closed", "parameters": {}}
     if any(k in m for k in DATA_KEYWORDS_APPOINTMENTS):
         return {"name": "get_appointments", "parameters": {}}
     if any(k in m for k in DATA_KEYWORDS_TEAM_KPI):
-        return {"name": "get_team_kpi", "parameters": {}}
-    if any(k in m for k in DATA_KEYWORDS_QUOTATIONS):
-        return {"name": "get_quotations", "parameters": {}}
+        return {"name": "get_sales_team_overview", "parameters": {}}
+    if any(k in m for k in DATA_KEYWORDS_QUOTATIONS) or re.search(r"\bqt\d{6,}\b", m, flags=re.IGNORECASE):
+        return {"name": "get_sales_docs", "parameters": {"doc_type": "QT", "query": user_message.strip()}}
     if any(k in m for k in DATA_KEYWORDS_DOCS):
         return {"name": "get_sales_docs", "parameters": {}}
     if any(k in m for k in DATA_KEYWORDS_PERMITS):
@@ -87,29 +89,12 @@ def _message_has_data_keyword(user_message: str) -> bool:
     if not (user_message or "").strip():
         return False
     m = user_message.lower()
-    return any(kw in m for kw in _DATA_KEYWORDS_ALL)
+    return any(kw in m for kw in _DATA_KEYWORDS_ALL) or bool(re.search(r"\bqt\d{6,}\b", m, flags=re.IGNORECASE))
 
 
 # Define tool schemas for LLM function calling
 # These are just schemas - actual execution happens in db_query_node
 TOOL_SCHEMAS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_lead_status",
-            "description": "Get status of a specific lead by name",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "lead_name": {
-                        "type": "string",
-                        "description": "Name of the lead to search for"
-                    }
-                },
-                "required": ["lead_name"]
-            }
-        }
-    },
     {
         "type": "function",
         "function": {
@@ -211,55 +196,28 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "get_team_kpi",
-            "description": "Get team performance KPI metrics (leads + conversion/contact rates) with per-member statistics (currentLeads, totalLeads, closedLeads, conversionRate, contactRate). Use for KPI/conversion questions, NOT for sales revenue (บาท) or closed-sales value.",
+            "name": "get_sales_team_overview",
+            "description": "Consolidated sales-team tool. Team mode (no sales_id): returns team-level KPI/revenue metrics per member (deals_closed, pipeline_value, conversion_rate). Member mode (with sales_id): returns specific salesperson performance. Use for KPI team questions, sales-by-member questions, and performance drill-down.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "team_id": {
+                    "date_from": {
+                        "type": "string",
+                        "description": "Start date in YYYY-MM-DD format",
+                        "format": "date"
+                    },
+                    "date_to": {
+                        "type": "string",
+                        "description": "End date in YYYY-MM-DD format",
+                        "format": "date"
+                    },
+                    "sales_id": {
                         "type": "integer",
-                        "description": "Optional team ID (default: all teams)"
+                        "description": "Optional. If provided, return performance for this specific sales member."
                     },
-                    "category": {
+                    "period": {
                         "type": "string",
-                        "description": "Optional category filter (Package/Wholesale)"
-                    },
-                    "date_from": {
-                        "type": "string",
-                        "description": "Start date in YYYY-MM-DD format",
-                        "format": "date"
-                    },
-                    "date_to": {
-                        "type": "string",
-                        "description": "End date in YYYY-MM-DD format",
-                        "format": "date"
-                    }
-                },
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_my_leads",
-            "description": "Get leads assigned to the current user (My Leads page). Returns leads where user is sale_owner_id OR post_sales_owner_id. Use when user asks about THEIR OWN leads (e.g., 'ลีดของฉัน', 'ลีดที่ assign ให้ฉัน', 'ลีดที่ฉันรับผิดชอบ'). Includes user data, sales member data, and statistics (byStatus, byPlatform).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "category": {
-                        "type": "string",
-                        "description": "Category filter (Package/Wholesale, default: Package)"
-                    },
-                    "date_from": {
-                        "type": "string",
-                        "description": "Start date in YYYY-MM-DD format",
-                        "format": "date"
-                    },
-                    "date_to": {
-                        "type": "string",
-                        "description": "End date in YYYY-MM-DD format",
-                        "format": "date"
+                        "description": "Optional period for sales_id mode: day|week|month|year (default: month)."
                     }
                 },
                 "required": []
@@ -317,33 +275,6 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "get_sales_team",
-            "description": "Get sales team list with performance metrics. Similar to get_team_kpi but may have different response structure. Use when user asks about sales team list with performance metrics.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "category": {
-                        "type": "string",
-                        "description": "Optional category filter (Package/Wholesale)"
-                    },
-                    "date_from": {
-                        "type": "string",
-                        "description": "Start date in YYYY-MM-DD format",
-                        "format": "date"
-                    },
-                    "date_to": {
-                        "type": "string",
-                        "description": "End date in YYYY-MM-DD format",
-                        "format": "date"
-                    }
-                },
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "get_sales_team_list",
             "description": "Get simple sales team list for dropdown/selection (used in Lead forms like Add Lead, Lead Management). Returns minimal data (id, user_id, current_leads, status, name, email, phone, department, position). Use when user asks for simple list of sales team members, active sales team, or sales team list (e.g., 'รายชื่อทีมขาย', 'ทีมขายที่ active', 'เลือกทีมขาย', 'รายชื่อเซลล์', 'พนักงานขายที่ active', 'รายชื่อพนักงานขายทั้งหมด'). This is the dropdown list used in forms. Filter by status='active' by default.",
             "parameters": {
@@ -352,56 +283,6 @@ TOOL_SCHEMAS = [
                     "status": {
                         "type": "string",
                         "description": "Filter by status (default: 'active')"
-                    }
-                },
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_sales_team_data",
-            "description": "Get sales team closed-deals revenue/performance with detailed metrics (deals_closed (QT), pipeline_value (บาท), conversion_rate) and data (leads, quotations). Use when user asks about 'ยอดขายของเซลล์/พนักงานขายแต่ละคน (บาท)', 'ปิดการขายได้กี่ดีล/ยอดปิดเป็นบาท', or similar revenue-by-member questions.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "date_from": {
-                        "type": "string",
-                        "description": "Start date in YYYY-MM-DD format",
-                        "format": "date"
-                    },
-                    "date_to": {
-                        "type": "string",
-                        "description": "End date in YYYY-MM-DD format",
-                        "format": "date"
-                    }
-                },
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_lead_management",
-            "description": "Get Lead Management page data (/lead-management) - used for managing Package leads. Returns: leads list, sales team data, user data, sales member data, and statistics (totalLeads, assignedLeads, unassignedLeads, assignmentRate, leadsWithContact, contactRate). Use when user asks about lead management overview, statistics, or managing leads (e.g., 'ข้อมูล Lead Management', 'แสดงสถานะการจัดการลีด', 'สถิติการ assign ลีด').",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "category": {
-                        "type": "string",
-                        "description": "Category filter (default: 'Package')"
-                    },
-                    "date_from": {
-                        "type": "string",
-                        "description": "Start date in YYYY-MM-DD format",
-                        "format": "date"
-                    },
-                    "date_to": {
-                        "type": "string",
-                        "description": "End date in YYYY-MM-DD format",
-                        "format": "date"
                     }
                 },
                 "required": []
@@ -438,69 +319,23 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "get_sales_performance",
-            "description": "Get sales performance for a SPECIFIC sales member (by sales_id). Use when user asks about performance of a specific sales person. Note: Only admin and manager can view sales performance.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "sales_id": {
-                        "type": "integer",
-                        "description": "ID of the sales member to get performance for (required)"
-                    },
-                    "date_from": {
-                        "type": "string",
-                        "description": "Start date in YYYY-MM-DD format",
-                        "format": "date"
-                    },
-                    "date_to": {
-                        "type": "string",
-                        "description": "End date in YYYY-MM-DD format",
-                        "format": "date"
-                    },
-                    "period": {
-                        "type": "string",
-                        "description": "Period: 'day', 'week', 'month', 'year' (default: 'month')"
-                    }
-                },
-                "required": ["sales_id"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "get_sales_docs",
-            "description": "Get sales documents (QT/Quotation, BL/Bill of Lading, INV/Invoice). Use when user asks about sales documents or invoices.",
+            "description": "Get sales documents. Use for sales docs, invoices, and quotation/QT lookup (including specific QT number like QT2026030013).",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "date_from": {
+                    "query": {
                         "type": "string",
-                        "description": "Start date in YYYY-MM-DD format",
-                        "format": "date"
+                        "description": "Optional natural language query. Can include specific doc number, e.g. 'รายละเอียด QT2026030013'."
                     },
-                    "date_to": {
+                    "document_number": {
                         "type": "string",
-                        "description": "End date in YYYY-MM-DD format",
-                        "format": "date"
+                        "description": "Optional exact document number to search (e.g., QT2026030013)."
                     },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Limit number of results (default: 100)"
-                    }
-                },
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_quotations",
-            "description": "Get quotations (ใบเสนอราคา). Use when user asks about quotations specifically.",
-            "parameters": {
-                "type": "object",
-                "properties": {
+                    "doc_type": {
+                        "type": "string",
+                        "description": "Optional document type filter, e.g. QT, BL, INV."
+                    },
                     "date_from": {
                         "type": "string",
                         "description": "Start date in YYYY-MM-DD format",
@@ -538,23 +373,6 @@ TOOL_SCHEMAS = [
                         "description": "End date in YYYY-MM-DD format",
                         "format": "date"
                     },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Limit number of results (default: 100)"
-                    }
-                },
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_user_info",
-            "description": "Get user information. Use when user asks about user information or user details.",
-            "parameters": {
-                "type": "object",
-                "properties": {
                     "limit": {
                         "type": "integer",
                         "description": "Limit number of results (default: 100)"
@@ -613,7 +431,7 @@ User context:
 
 Available tools (ALWAYS use function calling for data queries):
 
-=== LEADS MANAGEMENT (5 tools) ===
+=== LEADS MANAGEMENT (3 tools) ===
 1. search_leads - For Dashboard, Lead Management, and lead queries (listing leads, breakdown by status)
    Use when: Listing leads, dashboard statistics, leads by date/platform/category.
    ⚠️ Do NOT use for "เดือนที่แล้วปิดการขายไม่ได้กี่ราย" / "ปิดการขายไม่ได้กี่ราย" — use get_sales_unsuccessful instead (ตัวเลขตรงหน้า /reports/sales-unsuccessful).
@@ -621,79 +439,42 @@ Available tools (ALWAYS use function calling for data queries):
    ⚠️ STATUS RULE: When user does NOT ask for ONE specific status ("ขอข้อมูลลีดวันนี้", "ลีดวันนี้"), omit status. Only set status when user EXPLICITLY asks one status ("ลีดที่รอรับวันนี้", "closed leads").
    Examples: "ขอข้อมูลลีดวันนี้" → search_leads with query="today", no status. "เดือนที่แล้วปิดการขายไม่ได้กี่ราย" → get_sales_unsuccessful with date_from/date_to=last month. "ลีด huawei ปิดการขายไม่ได้กี่ราย" / "ลีด Huawei ย้อนหลัง 30 วัน ปิดไม่ได้กี่ราย" → get_sales_unsuccessful with date_from/date_to and platform="Huawei".
 
-2. get_lead_status - For finding ONE SPECIFIC lead by name (like phone validation lookup)
-   Use when: User asks about a SPECIFIC lead by name (e.g., "สถานะของลีดชื่อ John Doe", "ลีดชื่อ สมชาย")
-   ⚠️ NOT for listing multiple leads - use search_leads instead
-   Context: Similar to phone validation in Add Lead form
-
-3. get_my_leads - For My Leads page (/my-leads) - leads assigned to CURRENT USER
-   Use when: User asks about THEIR OWN leads (e.g., "ลีดของฉัน", "ลีดที่ assign ให้ฉัน")
-   Returns: Leads where user is sale_owner_id OR post_sales_owner_id + user data + statistics
-   Context: Used in My Leads page
-
-4. get_lead_detail - For Lead Detail page (/leads/:id) and Lead Timeline page (/leads/:id/timeline)
+2. get_lead_detail - For Lead Detail page (/leads/:id) and Lead Timeline page (/leads/:id/timeline)
    Use when: User asks for detailed/complete information (e.g., "รายละเอียดลีด ID 123", "Timeline ของลีด")
    Returns: Full lead data, ALL productivity logs, timeline, relations (credit_evaluation, lead_products, quotation_documents)
    Context: Used in Lead Detail and Lead Timeline pages
 
-5. get_lead_management - For Lead Management page (/lead-management) - managing Package leads
-   Use when: User asks about lead management overview, statistics, or managing leads
-   Returns: Leads list + sales team + user + statistics (totalLeads, assignedLeads, assignmentRate, etc.)
-   Context: Used in Lead Management page for Package sales
+=== SALES TEAM (2 tools) ===
+6. get_sales_team_overview - Consolidated sales-team metrics tool
+   Use when: User asks about team KPI, team performance, or sales-by-member amount (บาท)
+   Team mode: no sales_id -> returns team metrics per member
+   Member mode: with sales_id -> returns that specific sales member performance
+   Context: Replaces old get_team_kpi/get_sales_team/get_sales_team_data/get_sales_performance
 
-=== SALES TEAM (4 tools) ===
-6. get_team_kpi - For Dashboard and Sales Team page - team KPI and performance metrics
-   Use when: User asks about team performance, KPI, conversion rates (e.g., "KPI ของทีมขาย", "Dashboard ทีมขาย")
-   Returns: Sales team list with per-member metrics (currentLeads, totalLeads, closedLeads, conversionRate, contactRate) + overall statistics
-   Context: Used in Dashboard (/) and Sales Team (/sales-team) pages
-
-7. get_sales_team - For Dashboard and Sales Team page - sales team list with performance metrics
-   Use when: User asks about sales team list with performance (e.g., "รายการทีมขาย", "ทีมขายพร้อมสถิติ")
-   Similar to get_team_kpi but may have different response structure
-   Context: Used in Dashboard and Sales Team pages
-
-8. get_sales_team_list - For simple list of active sales team members (dropdown/selection)
+7. get_sales_team_list - For simple list of active sales team members (dropdown/selection)
    Use when: User asks for simple list of sales team, active sales team, or sales team list (e.g., "รายชื่อทีมขาย", "ทีมขายที่ active", "เลือกทีมขาย", "รายชื่อเซลล์", "พนักงานขายที่ active", "รายชื่อพนักงานขายทั้งหมด")
    Returns: Minimal data (id, user_id, current_leads, status, name, email, phone, department, position)
    Context: Used in Lead forms for dropdown selection, but also useful for listing active sales team members
 
-9. get_sales_team_data - For Sales Team page (/sales-team) - detailed data with leads and quotations
-   Use when: User asks about sales team with detailed performance data, deals, or pipeline value
-   Returns: Sales team with metrics (deals_closed, pipeline_value, conversion_rate) + leads + quotations data
-   Context: Used in Sales Team page for detailed view
-
 === APPOINTMENTS (2 tools) ===
-10. get_appointments - For My Appointments page (/my-appointments) - sales appointments
+8. get_appointments - For My Appointments page (/my-appointments) - sales appointments
     Use when: User asks about sales appointments (e.g., "นัดหมายวันนี้", "นัดช่าง", "นัดติดตาม", "นัดชำระเงิน", "นัดหมายของฉัน")
     Returns: Categorized appointments with structure containing followUp, engineer, and payment arrays
     Context: Used in My Appointments page (CRM)
 
-11. get_service_appointments - For Service Appointments page (/service-tracking/service-appointments) - service/maintenance
+9. get_service_appointments - For Service Appointments page (/service-tracking/service-appointments) - service/maintenance
     Use when: User asks about service appointments, maintenance appointments, or service tracking
     Examples: "นัดหมายบริการ", "นัดบริการซ่อม", "Service appointments"
     Difference: get_appointments = sales appointments (CRM), get_service_appointments = service appointments (Service Tracking)
     Context: Used in Service Tracking module
 
-=== DOCUMENTS & QUOTATIONS (2 tools) ===
-12. get_sales_docs - For sales documents (QT/Quotation, BL/Bill of Lading, INV/Invoice)
-    Use when: User asks about sales documents or invoices (e.g., "เอกสารการขาย", "ใบแจ้งหนี้")
-
-13. get_quotations - For quotations specifically (ใบเสนอราคา)
-    Use when: User asks about quotations specifically
+=== DOCUMENTS (1 tool) ===
+10. get_sales_docs - For sales documents (QT/Quotation, BL/Bill of Lading, INV/Invoice)
+    Use when: User asks about sales documents, invoices, or specific QT number (e.g., "เอกสารการขาย", "ใบแจ้งหนี้", "รายละเอียด QT2026030013")
 
 === PERMITS (1 tool) ===
-14. get_permit_requests - For permit requests (คำขออนุญาต)
+11. get_permit_requests - For permit requests (คำขออนุญาต)
     Use when: User asks about permit requests or permits
-
-=== PERFORMANCE (1 tool) ===
-15. get_sales_performance - For sales performance of a SPECIFIC sales member (by sales_id)
-    Use when: User asks about performance of a specific sales person
-    Note: Only admin and manager can view sales performance
-
-=== USER (1 tool) ===
-16. get_user_info - For user information
-    Use when: User asks about user information or user details
-
 
 === IMPORTANT: INVENTORY-RELATED FUNCTIONS (NOT AVAILABLE) ===
 ⚠️  The following functions are NOT available for AI Chatbot (inventory system not in use):
@@ -714,11 +495,9 @@ Available tools (ALWAYS use function calling for data queries):
 ✅ Use search_leads for: listing leads, dashboard by status, "ขอข้อมูลลีดวันนี้", "ลีดวันนี้มีกี่ราย". Apply PLATFORM RULE when user or context specifies a platform (e.g. "ลีด Huawei วันนี้" → query + platform)
 ✅ Only set search_leads status when user EXPLICITLY asks one status ("ลีดที่รอรับวันนี้", "closed leads")
 ✅ search_leads returns FULL lead data - LLM can calculate counts, group by status/platform/category
-✅ Use get_lead_status ONLY when user mentions a SPECIFIC lead name
-✅ Use get_my_leads when user asks about THEIR OWN leads (not all leads)
-✅ Use get_team_kpi for team performance/KPI queries
+✅ Use search_leads for specific lead-name lookup (e.g., "สถานะ lead ชื่อ ...") and summarize status from matched lead
+✅ Use get_sales_team_overview for team performance/KPI/revenue-by-member queries
 ✅ Use get_sales_team_list for simple lists (dropdown/selection)
-✅ Use get_sales_team_data for detailed data (leads, quotations, pipeline value)
 ✅ Always extract dates from natural language Thai dates (เมื่อวาน, สัปดาห์นี้, เดือนนี้)
 ✅ **Follow-up "แยก Package/Wholesales", "แยกรายการ", "อยากได้รายชื่อ", "ยอดขายตามแพลตฟอร์ม", "แยกตามแพลตฟอร์ม":** MUST call get_sales_closed with the date range from the previous user message (e.g. previous was ธันวา → use date_from=2025-12-01, date_to=2025-12-31). Do NOT answer from conversation memory — always use function calling to fetch data.
 """
@@ -821,10 +600,7 @@ Available tools (ALWAYS use function calling for data queries):
                 tool_call_params = tool_args.copy() if isinstance(tool_args, dict) else {}
                 
                 # Map tool names to actual function parameters
-                if tool_name == "get_lead_status":
-                    # user_id will be added in db_query_node
-                    pass
-                elif tool_name == "search_leads":
+                if tool_name == "search_leads":
                     # Extract query from message if not in args
                     if "query" not in tool_call_params:
                         tool_call_params["query"] = user_message
@@ -845,6 +621,34 @@ Available tools (ALWAYS use function calling for data queries):
                     # The LLM should extract dates from natural language
                     # date_from and date_to will be passed to search_leads function
                     # user_role will be added in db_query_node
+                elif tool_name == "get_sales_team_overview":
+                    # Ensure date range is extracted for period-based questions like
+                    # "เดือนนี้", "เดือนที่แล้ว", "สัปดาห์นี้", etc.
+                    if "date_from" not in tool_call_params or "date_to" not in tool_call_params:
+                        try:
+                            from app.utils.date_extractor import extract_date_range
+                            df, dt = extract_date_range(user_message)
+                            if df and dt:
+                                tool_call_params.setdefault("date_from", df)
+                                tool_call_params.setdefault("date_to", dt)
+                                logger.info(f"   📅 Auto-extracted date range for get_sales_team_overview: {df} to {dt}")
+                        except Exception as e:
+                            logger.warning(f"   ⚠️ Failed to auto-extract date range for get_sales_team_overview: {e}")
+                elif tool_name == "get_sales_docs":
+                    if "query" not in tool_call_params:
+                        tool_call_params["query"] = user_message
+                    if not tool_call_params.get("document_number"):
+                        m_doc = re.search(r"([A-Za-z]{2,5}\d{6,})", user_message or "", flags=re.IGNORECASE)
+                        if m_doc:
+                            tool_call_params["document_number"] = m_doc.group(1)
+                    # If user asks QT/quotation explicitly, default to QT docs
+                    user_message_lower = (user_message or "").lower()
+                    if not tool_call_params.get("doc_type") and (
+                        "ใบเสนอราคา" in user_message_lower
+                        or "quotation" in user_message_lower
+                        or "qt" in user_message_lower
+                    ):
+                        tool_call_params["doc_type"] = "QT"
                 
                 selected_tools.append({
                     "name": tool_name,

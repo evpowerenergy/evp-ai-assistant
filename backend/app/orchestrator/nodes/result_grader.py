@@ -231,7 +231,7 @@ def grade_result_rule_based(
         if is_empty_result(output):
             # Suggest fuzzy search for name-based queries
             suggested_params = {}
-            if tool_name in ["get_lead_status", "get_customer_info"]:
+            if tool_name in ["search_leads", "get_customer_info"]:
                 # Extract name from user message
                 import re
                 # Try to find name patterns

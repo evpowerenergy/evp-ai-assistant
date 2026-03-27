@@ -110,13 +110,6 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
         return 'ไม่พบข้อมูล'
       }
       
-      if (toolName === 'get_lead_status') {
-        if (data?.found) {
-          return `พบ lead: ${data.display_name || data.full_name || 'N/A'}`
-        }
-        return 'ไม่พบ lead'
-      }
-      
       if (toolName === 'get_daily_summary') {
         const newLeads = data?.new_leads_today || 0
         return `Lead ใหม่: ${newLeads} รายการ`

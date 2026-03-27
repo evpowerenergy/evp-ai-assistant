@@ -5,25 +5,18 @@ Executes database RPC tools selected by LLM
 from typing import Dict, Any
 from app.orchestrator.state import AIAssistantState
 from app.tools.db_tools import (
-    get_lead_status,
     get_daily_summary,
-    get_team_kpi,
     search_leads,
     get_sales_closed,
     get_sales_unsuccessful,
-    get_my_leads,
     get_lead_detail,
     get_appointments,
-    get_sales_team,
     get_sales_team_list,
-    get_sales_team_data,
-    get_lead_management,
+    get_sales_team_overview,
     get_service_appointments,
     get_sales_performance,
     get_sales_docs,
-    get_quotations,
-    get_permit_requests,
-    get_user_info
+    get_permit_requests
 )
 from app.utils.logger import get_logger
 
@@ -61,19 +54,7 @@ async def db_query_node(state: AIAssistantState) -> AIAssistantState:
                     logger.info(f"   Parameters: {params}")
                     
                     # Map tool names to actual functions
-                    if tool_name == "get_lead_status":
-                        lead_name = params.get("lead_name", "")
-                        if lead_name:
-                            result = await get_lead_status(lead_name, user_id)
-                            tool_results.append({
-                                "tool": "get_lead_status",
-                                "input": {"lead_name": lead_name},
-                                "output": result
-                            })
-                        else:
-                            logger.warning(f"   ⚠️  Missing lead_name parameter for get_lead_status")
-                    
-                    elif tool_name == "get_daily_summary":
+                    if tool_name == "get_daily_summary":
                         date = params.get("date")
                         result = await get_daily_summary(user_id, date=date, user_role=user_role)
                         tool_results.append({
@@ -145,36 +126,6 @@ async def db_query_node(state: AIAssistantState) -> AIAssistantState:
                             "output": result
                         })
                     
-                    elif tool_name == "get_team_kpi":
-                        team_id = params.get("team_id")
-                        category = params.get("category")
-                        date_from = params.get("date_from")
-                        date_to = params.get("date_to")
-                        result = await get_team_kpi(team_id, user_id, category=category, date_from=date_from, date_to=date_to, user_role=user_role)
-                        tool_results.append({
-                            "tool": "get_team_kpi",
-                            "input": {"team_id": team_id, "category": category, "date_from": date_from, "date_to": date_to},
-                            "output": result
-                        })
-                    
-                    elif tool_name == "get_my_leads":
-                        category = params.get("category", "Package")
-                        date_from = params.get("date_from")
-                        date_to = params.get("date_to")
-                        result = await get_my_leads(
-                            user_id=user_id,
-                            category=category,
-                            filters=None,
-                            user_role=user_role,
-                            date_from=date_from,
-                            date_to=date_to
-                        )
-                        tool_results.append({
-                            "tool": "get_my_leads",
-                            "input": {"category": category, "date_from": date_from, "date_to": date_to},
-                            "output": result
-                        })
-                    
                     elif tool_name == "get_lead_detail":
                         lead_id = params.get("lead_id")
                         if lead_id:
@@ -207,24 +158,6 @@ async def db_query_node(state: AIAssistantState) -> AIAssistantState:
                             "output": result
                         })
                     
-                    elif tool_name == "get_sales_team":
-                        category = params.get("category")
-                        date_from = params.get("date_from")
-                        date_to = params.get("date_to")
-                        result = await get_sales_team(
-                            user_id=user_id,
-                            category=category,
-                            filters=None,
-                            user_role=user_role,
-                            date_from=date_from,
-                            date_to=date_to
-                        )
-                        tool_results.append({
-                            "tool": "get_sales_team",
-                            "input": {"category": category, "date_from": date_from, "date_to": date_to},
-                            "output": result
-                        })
-                    
                     elif tool_name == "get_sales_team_list":
                         status = params.get("status", "active")
                         # If status is 'all', pass 'all' to function (it will convert to None)
@@ -241,39 +174,58 @@ async def db_query_node(state: AIAssistantState) -> AIAssistantState:
                             "output": result
                         })
                     
-                    elif tool_name == "get_sales_team_data":
+                    elif tool_name == "get_sales_team_overview":
                         date_from = params.get("date_from")
                         date_to = params.get("date_to")
-                        result = await get_sales_team_data(
+                        sales_id = params.get("sales_id")
+                        period = params.get("period", "month")
+                        if not date_from or not date_to:
+                            try:
+                                from app.utils.date_extractor import extract_date_range
+                                df, dt = extract_date_range(user_message)
+                                if df and dt:
+                                    date_from = date_from or df
+                                    date_to = date_to or dt
+                                    logger.info(f"   📅 Backfill date range for get_sales_team_overview: {date_from} to {date_to}")
+                            except Exception as e:
+                                logger.warning(f"   ⚠️ Failed to backfill date range for get_sales_team_overview: {e}")
+                        result = await get_sales_team_overview(
                             user_id=user_id,
-                            user_role=user_role,
-                            date_from=date_from,
-                            date_to=date_to
-                        )
-                        tool_results.append({
-                            "tool": "get_sales_team_data",
-                            "input": {"date_from": date_from, "date_to": date_to},
-                            "output": result
-                        })
-                    
-                    elif tool_name == "get_lead_management":
-                        category = params.get("category", "Package")
-                        date_from = params.get("date_from")
-                        date_to = params.get("date_to")
-                        result = await get_lead_management(
-                            user_id=user_id,
-                            category=category,
-                            include_user_data=True,
-                            include_sales_team=True,
-                            include_leads=True,
                             user_role=user_role,
                             date_from=date_from,
                             date_to=date_to,
-                            limit=None
+                            sales_id=sales_id,
+                            period=period,
                         )
                         tool_results.append({
-                            "tool": "get_lead_management",
-                            "input": {"category": category, "date_from": date_from, "date_to": date_to},
+                            "tool": "get_sales_team_overview",
+                            "input": {"date_from": date_from, "date_to": date_to, "sales_id": sales_id, "period": period},
+                            "output": result
+                        })
+
+                    # Backward compatibility: old tool names map to consolidated overview tool
+                    elif tool_name in ["get_team_kpi", "get_sales_team", "get_sales_team_data"]:
+                        date_from = params.get("date_from")
+                        date_to = params.get("date_to")
+                        if not date_from or not date_to:
+                            try:
+                                from app.utils.date_extractor import extract_date_range
+                                df, dt = extract_date_range(user_message)
+                                if df and dt:
+                                    date_from = date_from or df
+                                    date_to = date_to or dt
+                                    logger.info(f"   📅 Backfill date range for legacy sales team tool ({tool_name}): {date_from} to {date_to}")
+                            except Exception as e:
+                                logger.warning(f"   ⚠️ Failed to backfill date range for legacy sales team tool ({tool_name}): {e}")
+                        result = await get_sales_team_overview(
+                            user_id=user_id,
+                            user_role=user_role,
+                            date_from=date_from,
+                            date_to=date_to,
+                        )
+                        tool_results.append({
+                            "tool": "get_sales_team_overview",
+                            "input": {"date_from": date_from, "date_to": date_to, "source_tool": tool_name},
                             "output": result
                         })
                     
@@ -317,36 +269,53 @@ async def db_query_node(state: AIAssistantState) -> AIAssistantState:
                             logger.warning(f"   ⚠️  Missing sales_id parameter for get_sales_performance")
                     
                     elif tool_name == "get_sales_docs":
+                        query = params.get("query")
+                        document_number = params.get("document_number")
+                        doc_type = params.get("doc_type")
+                        if not document_number and query:
+                            import re
+                            m_doc = re.search(r"([A-Za-z]{2,5}\d{6,})", str(query), flags=re.IGNORECASE)
+                            if m_doc:
+                                document_number = m_doc.group(1)
                         date_from = params.get("date_from")
                         date_to = params.get("date_to")
                         limit = params.get("limit", 100)
                         result = await get_sales_docs(
                             user_id=user_id,
                             filters=None,
+                            query=query,
+                            document_number=document_number,
+                            doc_type=doc_type,
                             date_from=date_from,
                             date_to=date_to,
                             limit=limit
                         )
                         tool_results.append({
                             "tool": "get_sales_docs",
-                            "input": {"date_from": date_from, "date_to": date_to, "limit": limit},
+                            "input": {"query": query, "document_number": document_number, "doc_type": doc_type, "date_from": date_from, "date_to": date_to, "limit": limit},
                             "output": result
                         })
-                    
+
+                    # Backward compatibility: old quotations tool -> unified sales docs tool
                     elif tool_name == "get_quotations":
+                        query = params.get("query")
+                        document_number = params.get("document_number")
                         date_from = params.get("date_from")
                         date_to = params.get("date_to")
                         limit = params.get("limit", 100)
-                        result = await get_quotations(
+                        result = await get_sales_docs(
                             user_id=user_id,
                             filters=None,
+                            query=query,
+                            document_number=document_number,
+                            doc_type="QT",
                             date_from=date_from,
                             date_to=date_to,
-                            limit=limit
+                            limit=limit,
                         )
                         tool_results.append({
-                            "tool": "get_quotations",
-                            "input": {"date_from": date_from, "date_to": date_to, "limit": limit},
+                            "tool": "get_sales_docs",
+                            "input": {"query": query, "document_number": document_number, "doc_type": "QT", "date_from": date_from, "date_to": date_to, "limit": limit, "source_tool": "get_quotations"},
                             "output": result
                         })
                     
@@ -364,19 +333,6 @@ async def db_query_node(state: AIAssistantState) -> AIAssistantState:
                         tool_results.append({
                             "tool": "get_permit_requests",
                             "input": {"date_from": date_from, "date_to": date_to, "limit": limit},
-                            "output": result
-                        })
-                    
-                    elif tool_name == "get_user_info":
-                        limit = params.get("limit", 100)
-                        result = await get_user_info(
-                            user_id=user_id,
-                            filters=None,
-                            limit=limit
-                        )
-                        tool_results.append({
-                            "tool": "get_user_info",
-                            "input": {"limit": limit},
                             "output": result
                         })
                     

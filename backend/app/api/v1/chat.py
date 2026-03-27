@@ -264,11 +264,6 @@ async def chat_stream(
                                 step_info["preview"] = f"พบ {count} leads" if count > 0 else "ไม่พบข้อมูล"
                             else:
                                 step_info["preview"] = "กำลังดึงข้อมูล..."
-                        elif tool_name == "get_lead_status":
-                            if isinstance(output, dict) and output.get("found"):
-                                step_info["preview"] = f"พบ lead: {output.get('display_name', 'N/A')}"
-                            else:
-                                step_info["preview"] = "ไม่พบ lead"
                         else:
                             step_info["preview"] = f"เรียกใช้ {tool_name}"
                     else:
@@ -497,11 +492,6 @@ def build_process_steps(state: AIAssistantState, total_runtime: float) -> List[D
                 leads = output.get("data", {}).get("leads", [])
                 count = output.get("data", {}).get("stats", {}).get("returned", len(leads))
                 tool_preview = f"พบ {count} leads" if count > 0 else "ไม่พบข้อมูล"
-            elif tool_name == "get_lead_status":
-                if output.get("found"):
-                    tool_preview = f"พบ lead: {output.get('display_name', 'N/A')}"
-                else:
-                    tool_preview = "ไม่พบ lead"
             elif tool_name == "get_daily_summary":
                 new_leads = output.get("new_leads_today", 0)
                 tool_preview = f"Lead ใหม่: {new_leads} รายการ"
