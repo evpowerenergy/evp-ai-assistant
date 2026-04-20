@@ -68,7 +68,7 @@ Response:"""
         
         # Generate response using LLM
         try:
-            # Use temperature=1.0 for mini models (gpt-4o-mini, gpt-5-mini) - required by model
+            # Use temperature=1.0 for mini models (gpt-4o-mini, gpt-5-mini, gpt-5.4-mini) - required by model
             llm = get_llm(temperature=1.0)
             llm_response = await llm.ainvoke(prompt)
             response = llm_response.content if hasattr(llm_response, 'content') else str(llm_response)

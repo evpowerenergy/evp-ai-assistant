@@ -522,10 +522,10 @@ Available tools (ALWAYS use function calling for data queries):
         try:
             client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
             
-            # Mini models (gpt-4o-mini, gpt-5-mini) only support temperature=1.0 (default)
+            # Mini models (gpt-4o-mini, gpt-5-mini, gpt-5.4-mini) only support temperature=1.0 (default)
             # Remove temperature parameter to use default (1.0)
             response = await client.chat.completions.create(
-                model=settings.OPENAI_MODEL,  # Use model from settings (default: gpt-5-mini)
+                model=settings.OPENAI_MODEL,  # Use model from settings (default: gpt-5.4-mini)
                 messages=openai_messages,
                 tools=TOOL_SCHEMAS,
                 tool_choice=tool_choice  # "required" when message has data keywords so we fetch data

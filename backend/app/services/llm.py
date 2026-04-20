@@ -15,14 +15,14 @@ def get_llm(temperature: float = 1.0, model: str = None) -> ChatOpenAI:
     """
     Get or create OpenAI LLM instance
     Uses model from settings if not provided
-    Note: Some models (like gpt-4o-mini, gpt-5-mini) only support temperature=1.0 (default)
+    Note: Some models (like gpt-4o-mini, gpt-5-mini, gpt-5.4-mini) only support temperature=1.0 (default)
     """
     # Use default from settings if not provided
     if model is None:
         model = settings.OPENAI_MODEL
     
     # For mini models, force temperature=1.0 (they only support default)
-    mini_models = ["gpt-4o-mini", "gpt-5-mini"]
+    mini_models = ["gpt-4o-mini", "gpt-5-mini", "gpt-5.4-mini"]
     if model in mini_models and temperature != 1.0:
         logger.warning(f"{model} only supports temperature=1.0, using 1.0 instead of {temperature}")
         temperature = 1.0

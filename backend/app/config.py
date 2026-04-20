@@ -17,9 +17,9 @@ class Settings(BaseSettings):
     
     # OpenAI
     OPENAI_API_KEY: str
-    # เปลี่ยน model ได้ที่ไฟล์ .env โดยใส่ OPENAI_MODEL=ชื่อโมเดล (เช่น gpt-4o, gpt-4o-mini)
+    # เปลี่ยน model ได้ที่ไฟล์ .env โดยใส่ OPENAI_MODEL=ชื่อโมเดล (เช่น gpt-5.4, gpt-5.4-mini)
     # ค่า default ด้านล่างใช้เมื่อ .env ไม่ได้กำหนด OPENAI_MODEL
-    OPENAI_MODEL: str = "gpt-5.1"
+    OPENAI_MODEL: str = "gpt-5.4-mini"
     
     # LINE
     LINE_CHANNEL_SECRET: str = ""
