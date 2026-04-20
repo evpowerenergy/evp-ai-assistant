@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 
-from app.core.auth import get_current_user, require_role
+from app.core.auth import require_ai_assistant_access
 from app.services.supabase import get_supabase_client
 from app.orchestrator.graph import process_message
 from app.orchestrator.state import AIAssistantState
@@ -59,7 +59,7 @@ def _primary_tool_from_state(state: dict) -> Optional[str]:
 
 @router.get("/prompt-tests/cases")
 async def list_test_cases(
-    current_user: dict = Depends(require_role(["admin", "manager", "super_admin"]))
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """List all test cases"""
     try:
@@ -74,7 +74,7 @@ async def list_test_cases(
 @router.post("/prompt-tests/cases")
 async def create_test_case(
     body: TestCaseCreate,
-    current_user: dict = Depends(require_role(["admin", "manager", "super_admin"]))
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """Create a new test case"""
     try:
@@ -101,7 +101,7 @@ async def create_test_case(
 @router.get("/prompt-tests/cases/{case_id}")
 async def get_test_case(
     case_id: str,
-    current_user: dict = Depends(require_role(["admin", "manager", "super_admin"]))
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """Get a test case by id"""
     try:
@@ -121,7 +121,7 @@ async def get_test_case(
 async def update_test_case(
     case_id: str,
     body: TestCaseUpdate,
-    current_user: dict = Depends(require_role(["admin", "manager", "super_admin"]))
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """Update a test case"""
     try:
@@ -145,7 +145,7 @@ async def update_test_case(
 @router.delete("/prompt-tests/cases/{case_id}")
 async def delete_test_case(
     case_id: str,
-    current_user: dict = Depends(require_role(["admin", "manager", "super_admin"]))
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """Delete a test case"""
     try:
@@ -160,7 +160,7 @@ async def delete_test_case(
 @router.post("/prompt-tests/run/start")
 async def run_tests_start(
     body: RunStartRequest,
-    current_user: dict = Depends(require_role(["admin", "manager", "super_admin"]))
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """สร้าง run record แล้วค่อยรันทีละเคสผ่าน run/one — คืน run_id"""
     try:
@@ -285,7 +285,7 @@ async def _run_single_case(
 @router.post("/prompt-tests/run/one")
 async def run_one_test(
     body: RunOneRequest,
-    current_user: dict = Depends(require_role(["admin", "manager", "super_admin"]))
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """รันหนึ่ง test case แล้วคืนผล — ใช้ร่วมกับ run/start เพื่อให้ผลออกทีละ row"""
     try:
@@ -318,7 +318,7 @@ async def run_one_test(
 @router.post("/prompt-tests/run")
 async def run_tests(
     body: RunTestsRequest,
-    current_user: dict = Depends(require_role(["admin", "manager", "super_admin"]))
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """
     Run E2E tests: send each test case through the chat pipeline,
@@ -472,7 +472,7 @@ async def run_tests(
 @router.get("/prompt-tests/runs")
 async def list_runs(
     limit: int = 20,
-    current_user: dict = Depends(require_role(["admin", "manager", "super_admin"]))
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """List recent test runs"""
     try:
@@ -487,7 +487,7 @@ async def list_runs(
 @router.get("/prompt-tests/runs/{run_id}")
 async def get_run_results(
     run_id: str,
-    current_user: dict = Depends(require_role(["admin", "manager", "super_admin"]))
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """Get results for a specific run"""
     try:

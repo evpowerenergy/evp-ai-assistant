@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     # เปลี่ยน model ได้ที่ไฟล์ .env โดยใส่ OPENAI_MODEL=ชื่อโมเดล (เช่น gpt-5.4, gpt-5.4-mini)
     # ค่า default ด้านล่างใช้เมื่อ .env ไม่ได้กำหนด OPENAI_MODEL
-    OPENAI_MODEL: str = "gpt-5.4-mini"
+    OPENAI_MODEL: str = "gpt-5.4"
     
     # LINE
     LINE_CHANNEL_SECRET: str = ""
@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
     API_PORT: int = 8000
+
+    # Who may use authenticated AI Assistant APIs (comma-separated; case-insensitive match)
+    AI_ASSISTANT_ALLOWED_ROLES: str = "super_admin,manager_sale,manager_marketing,manager_hr"
     
     # CORS - Accept string, will be parsed to list via property
     # Can be set as comma-separated string: "http://localhost:3000,http://localhost:3001"
@@ -79,6 +82,14 @@ class Settings(BaseSettings):
         
         # Single string
         return [v_stripped] if v_stripped else ["http://localhost:3000"]
+    
+    @property
+    def ai_assistant_allowed_roles_list(self) -> List[str]:
+        """Roles allowed to call protected AI Assistant endpoints."""
+        raw = (self.AI_ASSISTANT_ALLOWED_ROLES or "").strip()
+        if not raw:
+            return ["super_admin", "manager_sale", "manager_marketing", "manager_hr"]
+        return [x.strip() for x in raw.split(",") if x.strip()]
     
     model_config = SettingsConfigDict(
         env_file=".env",

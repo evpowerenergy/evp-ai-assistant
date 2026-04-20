@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import apiClient from '@/lib/api/client'
+import { AI_ASSISTANT_ALLOWED_ROLES, hasAiAssistantAccess } from '@/lib/aiAssistantAccess'
 
 interface TestCase {
   id: string
@@ -299,14 +300,14 @@ export default function PromptTestsPage() {
     }
   }
 
-  const allowedRoles = ['admin', 'manager', 'super_admin']
-  const roleOk = !userRole || allowedRoles.includes(userRole.toLowerCase().trim())
-  if (!roleOk) {
+  if (!hasAiAssistantAccess(userRole)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-          <p className="mt-2 text-muted-foreground">You need admin/manager/super_admin role to access this page.</p>
+          <p className="mt-2 text-muted-foreground">
+            Required role: {AI_ASSISTANT_ALLOWED_ROLES.join(', ')}
+          </p>
           <p className="mt-2 text-sm text-muted-foreground">Your role: &quot;{userRole}&quot;</p>
         </div>
       </div>

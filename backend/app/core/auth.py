@@ -144,6 +144,27 @@ async def get_current_user(
         raise AuthenticationError("Failed to authenticate")
 
 
+async def require_ai_assistant_access(
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """
+    Only users whose role is in AI_ASSISTANT_ALLOWED_ROLES may use authenticated AI APIs.
+    """
+    allowed = {r.lower() for r in settings.ai_assistant_allowed_roles_list}
+    user_role = (current_user.get("role") or "").strip().lower()
+    if user_role not in allowed:
+        allowed_str = ", ".join(settings.ai_assistant_allowed_roles_list)
+        logger.warning(
+            "AI Assistant access denied for user %s with role %s",
+            current_user.get("id"),
+            current_user.get("role"),
+        )
+        raise PermissionDeniedError(
+            f"AI Assistant access requires one of these roles: {allowed_str}"
+        )
+    return current_user
+
+
 def require_role(allowed_roles: list[str]):
     """
     Dependency factory to require specific role (case-insensitive).

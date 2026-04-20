@@ -15,24 +15,16 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
 
   const allowedRoles = requiredRole?.map((r) => r.toLowerCase()) ?? []
   const userRoleLower = (userRole ?? '').toLowerCase().trim()
+  const requiresRoleCheck = (requiredRole?.length ?? 0) > 0
+  /** Strict: empty role or role not in list => no access */
   const hasRole =
-    allowedRoles.length === 0 ||
-    !userRoleLower ||
-    allowedRoles.includes(userRoleLower)
+    !requiresRoleCheck || (userRoleLower !== '' && allowedRoles.includes(userRoleLower))
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      if (requiredRole && userRole && !allowedRoles.includes(userRoleLower)) {
-        router.push('/chat')
-        return
-      }
+    if (!loading && !user) {
+      router.push('/login')
     }
-  }, [user, loading, userRole, requiredRole, router, userRoleLower, allowedRoles])
+  }, [user, loading, router])
 
   if (loading) {
     return (
@@ -49,13 +41,17 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     return null
   }
 
-  if (requiredRole && userRole && !hasRole) {
+  if (requiresRoleCheck && !hasRole) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-          <p className="mt-2 text-muted-foreground">You don't have permission to access this page.</p>
-          <p className="mt-2 text-sm text-muted-foreground">Your role: &quot;{userRole}&quot; — required: {requiredRole.join(', ')}</p>
+          <p className="mt-2 text-muted-foreground">
+            Your account does not have permission to use the AI Assistant.
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Your role: &quot;{userRole ?? '—'}&quot; — required: {requiredRole?.join(', ')}
+          </p>
         </div>
       </div>
     )

@@ -2,12 +2,11 @@
 
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
-
-const ADMIN_ROLES = ['admin', 'manager', 'super_admin']
+import { hasAiAssistantAccess } from '@/lib/aiAssistantAccess'
 
 export default function AdminPage() {
   const { userRole } = useAuth()
-  const allowed = userRole != null && ADMIN_ROLES.includes(userRole.toLowerCase().trim())
+  const allowed = hasAiAssistantAccess(userRole)
 
   if (!allowed) {
     return (

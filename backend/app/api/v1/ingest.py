@@ -3,7 +3,7 @@ Document Ingestion API Endpoint (Admin only)
 """
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Form
 from typing import Optional
-from app.core.auth import get_current_user, require_role
+from app.core.auth import require_ai_assistant_access
 from app.core.audit import log_audit
 from app.services.vector_store import ingest_document
 from app.utils.logger import get_logger
@@ -17,11 +17,11 @@ router = APIRouter()
 async def ingest_document_endpoint(
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
-    current_user: dict = Depends(require_role(["admin"]))
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """
     Ingest document into knowledge base
-    Admin only endpoint
+    (Same role gate as other AI Assistant APIs.)
     
     Supports: .txt, .md, .pdf (text extraction)
     """

@@ -409,8 +409,36 @@ textarea:-webkit-autofill:focus {
   background-color: rgba(17, 24, 39, 0.9) !important;
 }
 
+/* Placeholder must set -webkit-text-fill-color too: input uses -webkit-text-fill-color for typed text,
+   otherwise WebKit shows placeholder the same color as value text. */
 .ai-login-input::placeholder {
-  color: #94a3b8 !important;
+  color: rgba(15, 23, 42, 0.38) !important;
+  opacity: 1 !important;
+}
+
+.ai-login-input::-webkit-input-placeholder {
+  color: rgba(15, 23, 42, 0.38) !important;
+  -webkit-text-fill-color: rgba(15, 23, 42, 0.38) !important;
+}
+
+.ai-login-input::-moz-placeholder {
+  color: rgba(15, 23, 42, 0.38) !important;
+  opacity: 1 !important;
+}
+
+.dark .ai-login-input::placeholder {
+  color: rgba(248, 250, 252, 0.38) !important;
+  opacity: 1 !important;
+}
+
+.dark .ai-login-input::-webkit-input-placeholder {
+  color: rgba(248, 250, 252, 0.38) !important;
+  -webkit-text-fill-color: rgba(248, 250, 252, 0.38) !important;
+}
+
+.dark .ai-login-input::-moz-placeholder {
+  color: rgba(248, 250, 252, 0.38) !important;
+  opacity: 1 !important;
 }
 
 .ai-login-input:focus {
@@ -419,10 +447,26 @@ textarea:-webkit-autofill:focus {
   background-color: #ffffff !important;
 }
 
+.ai-login-input:focus::placeholder,
+.ai-login-input:focus::-webkit-input-placeholder,
+.ai-login-input:focus::-moz-placeholder {
+  color: rgba(15, 23, 42, 0.38) !important;
+  -webkit-text-fill-color: rgba(15, 23, 42, 0.38) !important;
+  opacity: 1 !important;
+}
+
 .dark .ai-login-input:focus {
   color: #f8fafc !important;
   -webkit-text-fill-color: #f8fafc !important;
   background-color: #111827 !important;
+}
+
+.dark .ai-login-input:focus::placeholder,
+.dark .ai-login-input:focus::-webkit-input-placeholder,
+.dark .ai-login-input:focus::-moz-placeholder {
+  color: rgba(248, 250, 252, 0.38) !important;
+  -webkit-text-fill-color: rgba(248, 250, 252, 0.38) !important;
+  opacity: 1 !important;
 }
 
 input.ai-login-input:-webkit-autofill,

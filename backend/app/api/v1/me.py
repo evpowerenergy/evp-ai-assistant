@@ -3,7 +3,7 @@ Current user profile API - ดึง role จากตาราง users/employe
 แบบเดียวกับ CRM ที่ใช้ additional-auth-user-data
 """
 from fastapi import APIRouter, Depends
-from app.core.auth import get_current_user
+from app.core.auth import require_ai_assistant_access
 from app.services.supabase import get_supabase_client
 from app.utils.logger import get_logger
 
@@ -12,7 +12,7 @@ router = APIRouter()
 
 
 @router.get("/me")
-async def get_me(current_user: dict = Depends(get_current_user)):
+async def get_me(current_user: dict = Depends(require_ai_assistant_access)):
     """
     คืน role (และ profile) ของ user ปัจจุบันจากตาราง users หรือ employees
     ใช้ service role จึงไม่ติด RLS (แบบเดียวกับ CRM additional-auth-user-data)

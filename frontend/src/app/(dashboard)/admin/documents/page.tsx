@@ -20,7 +20,7 @@ export default function DocumentsPage() {
         <p className="mt-2 text-muted-foreground">Upload and manage knowledge base documents</p>
       </div>
 
-      {userRole === 'admin' && (
+      {userRole === 'super_admin' && (
         <div className="mb-8">
           <DocumentUpload onUploadSuccess={handleUploadSuccess} />
         </div>

@@ -1,5 +1,6 @@
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { AI_ASSISTANT_ALLOWED_ROLES } from '@/lib/aiAssistantAccess'
 
 export default function DashboardLayout({
   children,
@@ -8,7 +9,7 @@ export default function DashboardLayout({
 }) {
   return (
     <ErrorBoundary>
-      <ProtectedRoute>{children}</ProtectedRoute>
+      <ProtectedRoute requiredRole={[...AI_ASSISTANT_ALLOWED_ROLES]}>{children}</ProtectedRoute>
     </ErrorBoundary>
   )
 }

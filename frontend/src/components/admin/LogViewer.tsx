@@ -37,8 +37,8 @@ export function LogViewer() {
         .order('created_at', { ascending: false })
         .limit(100)
 
-      // Filter by user if not admin
-      if (userRole !== 'admin') {
+      // Filter by user if not super_admin (full audit log access)
+      if (userRole !== 'super_admin') {
         query = query.eq('user_id', (await supabase.auth.getUser()).data.user?.id || '')
       }
 

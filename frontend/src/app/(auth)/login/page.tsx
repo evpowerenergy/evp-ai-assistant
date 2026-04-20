@@ -213,7 +213,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="ai-login-input block w-full rounded-xl border border-border/70 bg-input/80 px-4 py-3 ring-0 transition-all placeholder:text-muted-foreground focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="ai-login-input block w-full rounded-xl border border-border/70 bg-input/80 px-4 py-3 ring-0 transition-all focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 placeholder="username/email"
               />
             </div>
@@ -231,7 +231,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="ai-login-input block w-full rounded-xl border border-border/70 bg-input/80 px-4 py-3 pr-12 ring-0 transition-all placeholder:text-muted-foreground focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  className="ai-login-input block w-full rounded-xl border border-border/70 bg-input/80 px-4 py-3 pr-12 ring-0 transition-all focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                   placeholder="Enter your password"
                 />
                 <button

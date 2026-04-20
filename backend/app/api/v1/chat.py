@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 from uuid import uuid4
 import time
 import json
-from app.core.auth import get_current_user
+from app.core.auth import require_ai_assistant_access
 from app.core.audit import log_chat_request, log_tool_call
 from app.orchestrator.graph import process_message, process_message_stream
 from app.orchestrator.state import AIAssistantState
@@ -43,7 +43,7 @@ class ChatResponse(BaseModel):
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """
     Main chat endpoint
@@ -164,7 +164,7 @@ async def chat(
 @router.post("/chat/stream")
 async def chat_stream(
     request: ChatRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """
     Streaming chat endpoint
@@ -417,7 +417,7 @@ async def save_messages(session_id: str, user_message: str, state: AIAssistantSt
 @router.get("/chat/history/{session_id}")
 async def get_chat_history(
     session_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_ai_assistant_access),
     limit: int = 100
 ):
     """

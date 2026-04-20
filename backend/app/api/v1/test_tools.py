@@ -5,7 +5,7 @@ Test Tools API Endpoint
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-from app.core.auth import get_current_user
+from app.core.auth import require_ai_assistant_access
 from app.tools.db_tools import (
     get_daily_summary,
     search_leads,
@@ -27,7 +27,7 @@ class TestToolRequest(BaseModel):
 @router.post("/test-tools")
 async def test_tools(
     request: TestToolRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_ai_assistant_access)
 ):
     """
     Test database tools directly

@@ -88,8 +88,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
 
   useEffect(() => {
-    // Get initial session and refresh if needed
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+    const init = async () => {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession()
+
       if (error) {
         console.error('Error getting session:', error)
         setSession(null)
@@ -99,18 +103,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      // Check if session exists and is valid
       if (session) {
-        // Check if token is expired (with 5 min buffer)
         const expiresAt = session.expires_at || 0
         const now = Math.floor(Date.now() / 1000)
         const timeUntilExpiry = expiresAt - now
 
-        // If token expires within 5 minutes, try to refresh
         if (timeUntilExpiry < 300) {
-          console.log('Token expiring soon, refreshing...')
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-          
+
           if (refreshError) {
             console.error('Error refreshing session:', refreshError)
             setSession(null)
@@ -119,12 +119,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else if (refreshData.session) {
             setSession(refreshData.session)
             setUser(refreshData.user)
-            resolveUserRole(supabase, refreshData.user, refreshData.session).then(setUserRole)
+            const role = await resolveUserRole(supabase, refreshData.user, refreshData.session)
+            setUserRole(role)
           }
         } else {
           setSession(session)
           setUser(session.user ?? null)
-          resolveUserRole(supabase, session.user, session).then(setUserRole)
+          const role = await resolveUserRole(supabase, session.user, session)
+          setUserRole(role)
         }
       } else {
         setSession(null)
@@ -133,16 +135,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setLoading(false)
-    })
+    }
 
-    // Listen for auth changes
+    void init()
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session) {
         setSession(session)
         setUser(session.user ?? null)
-        resolveUserRole(supabase, session.user, session).then(setUserRole)
+        const role = await resolveUserRole(supabase, session.user, session)
+        setUserRole(role)
       } else {
         setSession(null)
         setUser(null)
@@ -164,7 +168,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setSession(data.session)
     setUser(data.user)
-    resolveUserRole(supabase, data.user, data.session).then(setUserRole)
+    const role = await resolveUserRole(supabase, data.user, data.session)
+    setUserRole(role)
     router.push('/chat')
     router.refresh()
   }
