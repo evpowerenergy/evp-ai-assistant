@@ -1,221 +1,202 @@
-# 🤖 AI Assistant - Internal AI Assistant & Knowledge Chatbot
+# EVP AI Assistant
 
-> **Status:** ✅ Phase 3 Complete | Ready for Testing  
-> **Version:** 0.1.0
+Internal AI Assistant and knowledge chatbot for EV Power Energy.  
+The system serves authorized internal users with role-based access, combines database RPC tools and document RAG, and provides a web-first experience with LINE integration planned as a follow-up phase.
 
----
+## Product Snapshot
 
-## 📋 Overview
+- **Project:** `evp-ai-assistant`
+- **Version:** `0.1.0`
+- **Primary Channel:** Web app (Next.js + FastAPI)
+- **Core Capabilities:** CRM data Q&A (RPC), document Q&A (RAG), sessioned chat, audit logging
+- **Current Maturity:** Internal-use deployment with production infrastructure on Cloud Run
 
-Internal AI Assistant & Knowledge Chatbot สำหรับ EV Power Energy ที่สามารถ:
-- ตอบคำถามจาก **Database** (ผ่าน RPC functions)
-- ตอบคำถามจาก **เอกสาร** (ผ่าน RAG)
-- ควบคุมสิทธิ์ข้อมูลตาม role
-- ใช้งานผ่าน **Web** และ **LINE**
+## Why This Project Exists
 
----
+EVP AI Assistant is designed to reduce time spent finding business information by:
 
-## 🏗️ Architecture
+- answering data questions from CRM via controlled RPC tools
+- answering policy/process questions from internal documents using vector search
+- enforcing role-based access control for AI features
+- logging important AI usage events for auditability
 
+## High-Level Architecture
+
+```text
+Browser (Next.js Frontend)
+  -> FastAPI Backend (Auth, API, Orchestrator)
+     -> LangGraph Workflow (intent -> tools -> response)
+        -> Supabase RPC (CRM data)
+        -> Supabase pgvector (RAG)
+        -> OpenAI (generation + reasoning)
 ```
-Frontend (Next.js 14)
-    ↓
-Backend API (FastAPI)
-    ↓
-AI Orchestrator (LangGraph)
-    ├─→ Database RPC Tools (15 functions)
-    ├─→ Document RAG (pgvector)
-    └─→ Intent Router
+
+Key architectural principles:
+
+- Frontend uses Supabase anon credentials only.
+- Backend holds Supabase service role and OpenAI API key.
+- All AI business-data access is mediated through allowlisted backend tools.
+
+## Core Features
+
+- **Authentication and authorization**
+  - Supabase login flow
+  - Backend role check via allowed roles list
+- **Chat orchestration**
+  - Intent routing (database, rag, clarify, general)
+  - Sync and SSE streaming chat endpoints
+  - Session and message history
+- **Database intelligence**
+  - RPC-based tool execution against CRM data
+  - Controlled tool surface via backend allowlist
+- **Document intelligence (RAG)**
+  - Document ingest pipeline
+  - Embedding + vector retrieval with pgvector
+- **Admin operations**
+  - Document ingestion flows
+  - Prompt testing and logs support surfaces
+
+## Technology Stack
+
+- **Frontend:** Next.js 14, React 18, TypeScript, Tailwind
+- **Backend:** Python 3.12, FastAPI, Uvicorn, LangGraph/LangChain
+- **Data platform:** Supabase (PostgreSQL, Auth, RPC, pgvector)
+- **LLM provider:** OpenAI
+- **Deployment target:** Google Cloud Run (frontend and backend)
+
+## Repository Structure
+
+```text
+evp-ai-assistant/
+├── backend/                  # FastAPI app + orchestrator + tools
+├── frontend/                 # Next.js app (App Router)
+├── supabase/migrations/      # DB schema and RPC migrations
+├── docs/                     # Product and technical documents
+├── scripts/                  # Deployment scripts
+└── .github/workflows/        # CI/CD workflows
 ```
 
----
+## Prerequisites
 
-## 🚀 Quick Start
-
-### Prerequisites
 - Python 3.12+
 - Node.js 18+
-- Supabase account
+- Supabase project with required tables/RPC/migrations
 - OpenAI API key
 
-### 1. Setup Backend
+## Local Development Quick Start
+
+### 1) Backend setup
 
 ```bash
 cd backend
-
-# Create virtual environment
 python3.12 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
-
-# Setup environment variables
 cp .env.example .env
-# Edit .env with your credentials
-
-# Run migrations on Supabase
-# (Use Supabase Dashboard or CLI)
-
-# Start backend
+# update .env values
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 2. Setup Frontend
+### 2) Frontend setup
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Setup environment variables
 cp .env.example .env.local
-# Edit .env.local with your credentials
-
-# Start frontend
+# update .env.local values
 npm run dev
 ```
 
-### 3. Access Application
+### 3) Open local services
 
-- **Frontend:** http://localhost:3000
-- **Backend API:** http://localhost:8000
-- **API Docs:** http://localhost:8000/docs
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:8000`
+- API docs: `http://localhost:8000/docs`
 
----
+## Environment Variables
 
-## 📁 Project Structure
+### Backend (`backend/.env`)
 
-```
-evp-ai-assistant/
-├── backend/              # FastAPI backend
-│   ├── app/
-│   │   ├── api/         # API endpoints
-│   │   ├── core/        # Auth, permissions, audit
-│   │   ├── orchestrator/# LangGraph workflow
-│   │   ├── services/    # Supabase, LLM, Vector Store
-│   │   └── tools/       # DB, RAG, LINE tools
-│   └── requirements.txt
-├── frontend/             # Next.js 14 frontend
-│   ├── src/
-│   │   ├── app/         # Pages (App Router)
-│   │   ├── components/  # React components
-│   │   ├── hooks/       # Custom hooks
-│   │   └── lib/         # Utilities
-│   └── package.json
-├── supabase/
-│   └── migrations/      # Database migrations
-└── docs/                # Documentation
-```
-
----
-
-## 🗄️ Database
-
-### Migrations (4 files)
-1. `20250116000001_initial_schema.sql` - Core tables
-2. `20250116000003_ai_rpc_functions.sql` - Simple RPC functions (4)
-3. `20250116000005_ai_rpc_functions_enhanced.sql` - Enhanced RPC functions (5)
-4. `20250116000006_ai_rpc_functions_complete.sql` - Complete RPC functions (6)
-
-### RPC Functions (15 functions)
-- Simple: 4 functions
-- Enhanced: 5 functions
-- Complete: 6 functions
-
-**Coverage:** ~67% (including partial)
-
----
-
-## 🔧 Configuration
-
-### Backend Environment Variables
 ```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-OPENAI_API_KEY=your_openai_api_key
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+OPENAI_API_KEY=...
+OPENAI_MODEL=...
+AI_ASSISTANT_ALLOWED_ROLES=super_admin,manager_sale,manager_marketing,manager_hr
 CORS_ORIGINS=http://localhost:3000
 ```
 
-**Production (Cloud Run + custom domain):** ตั้ง `CORS_ORIGINS` ให้รวม **origin ของหน้าเว็บจริง** (เช่น `https://assistant.evpowerenergy.com`) คั่นด้วย comma ร่วมกับ URL แบบ `*.run.app` ถ้ายังเปิดผ่าน URL เดิมได้ — ถ้าไม่ใส่ custom domain จะเกิด error แบบ *No `Access-Control-Allow-Origin` header* ในเบราว์เซอร์
+### Frontend (`frontend/.env.local`)
 
-### Frontend Environment Variables
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
----
+Production note:
 
-## 📚 Documentation
+- Set `CORS_ORIGINS` to include the real frontend origin(s), including custom domain and any active Cloud Run domain used by clients.
+- `NEXT_PUBLIC_*` values are embedded at build time; changing them requires rebuilding frontend image.
 
-- [Development Plan](./docs/DEVELOPMENT_PLAN.md) - Complete development plan
-- [Getting Started](./docs/GETTING_STARTED.md) - Setup guide
-- [Testing Guide](./docs/TESTING_GUIDE.md) - Testing instructions
-- [RPC Functions Guide](./docs/RPC_FUNCTIONS_GUIDE.md) - RPC functions documentation
-- [Phase 1 Complete](./docs/PHASE_1_COMPLETE.md) - Phase 1 summary
-- [Phase 2 Progress](./docs/PHASE_2_PROGRESS.md) - Phase 2 status
-- [Phase 3 Complete](./docs/PHASE_3_COMPLETE.md) - Phase 3 summary
+## Security Notes
 
----
+- Do not commit secrets; use env vars / secret manager / CI secrets.
+- Keep Supabase service role key on backend only.
+- Current auth flow validates expiry and resolves user role from DB.
+- JWT signature verification against JWKS is an improvement item for hardening.
+- Current rate limiting is in-memory per instance, not distributed global throttling.
 
-## ✅ Current Status
+## Deployment Summary
 
-### Phase 1: Foundation & Setup ✅
-- Repository structure
-- Backend foundation
-- Frontend foundation
-- Database migrations
-- CI/CD workflows
+- **Backend:** Cloud Build -> Cloud Run (see `cloudbuild-backend.yaml`, `scripts/deploy-backend.sh`)
+- **Frontend:** Cloud Build -> Cloud Run (see `frontend/cloudbuild.yaml`, `scripts/deploy-frontend.sh`)
+- **Runtime config template:** `env.cloudrun.example`
+- **Detailed guide:** `docs/CLOUD_DEPLOY.md`
 
-### Phase 2: Backend Core ✅ (80%)
-- Authentication & Authorization ✅
-- Database RPC Tools ✅ (15 functions)
-- AI Orchestration ✅
-- Document RAG ✅
-- API Endpoints ✅
-- Audit & Logging ✅
+## API Surface (Important Endpoints)
 
-### Phase 3: Frontend Core ✅
-- Authentication UI ✅
-- Chat Interface ✅
-- Session Management ✅
-- Admin Console ✅
-- UI/UX Polish ✅
+- `POST /api/v1/chat`
+- `POST /api/v1/chat/stream`
+- `GET /api/v1/chat/history/{session_id}`
+- `POST /api/v1/ingest`
+- `GET /api/v1/me`
+- `GET /api/v1/health`
 
-### Phase 4: LINE Integration ⏳
-- LINE Webhook
-- LINE User Linking
-- LINE Notifications
+## Testing
 
-### Phase 5: Testing & Polish ⏳
-- Comprehensive testing
-- Bug fixes
-- Documentation
+- Backend unit/integration: `pytest` (see `backend/tests` and `backend/pytest.ini`)
+- Smoke test flow:
+  1. start backend and frontend
+  2. log in with allowed role
+  3. send chat prompts for DB and RAG scenarios
+  4. verify response, steps, and citations
 
----
+## Known Scope Boundaries
 
-## 🧪 Testing
+- LINE webhook path exists but full production-grade LINE integration is still partial.
+- Distributed/global rate limiting is not yet implemented.
+- Security hardening around JWT cryptographic verification is tracked as future work.
 
-**Status:** ✅ Ready for Testing
+## Documentation Index
 
-**Quick Test:**
-1. Start backend: `uvicorn app.main:app --reload`
-2. Start frontend: `npm run dev`
-3. Login at http://localhost:3000
-4. Send test message
+- `docs/PRD.md` - Product requirements and scope
+- `docs/TECHNICAL_ARCHITECTURE.md` - Technical architecture and module flow
+- `docs/CLOUD_DEPLOY.md` - Cloud Run deployment guide
+- `docs/GETTING_STARTED.md` - Environment setup
+- `docs/TESTING_GUIDE.md` - Testing scenarios and checklist
+- `docs/RPC_FUNCTIONS_GUIDE.md` - RPC tool references
 
-**See:** [TESTING_GUIDE.md](./docs/TESTING_GUIDE.md)
+## Roadmap (Current Direction)
 
----
+- **Phase 1-3:** foundation, core backend, core frontend - completed for internal use
+- **Phase 4:** complete LINE integration
+- **Phase 5:** hardening, broader testing, operational polish
 
-## 📝 License
+## License
 
-Internal use only - EV Power Energy
+Internal use only - EV Power Energy.
 
 ---
 
-**Last Updated:** 2025-01-16  
-**Status:** ✅ Ready for Testing
+Last updated: 2026-04
