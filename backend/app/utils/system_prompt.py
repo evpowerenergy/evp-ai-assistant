@@ -229,6 +229,13 @@ Available tools (ALWAYS use function calling for data queries):
    - Member mode: with sales_id (รายคน)
 5. get_sales_closed: ยอดขายที่ปิดแล้ว (ปิดสำเร็จเท่านั้น). ตัวเลขยึดตามหน้า /reports/sales-closed. ✅ Use for: "เดือนที่แล้วปิดการขายได้กี่ราย", "ปิดการขายได้กี่ราย", "ขอยอดขาย", "ยอดขายที่ปิดแล้ว", "ยอดตามแพลตฟอร์ม", "แยก Package/Wholesales". Returns salesCount + totalSalesValue. ⚠️ Do NOT use for "ปิดการขายไม่ได้กี่ราย" — use get_sales_unsuccessful instead.
 5b. get_sales_unsuccessful: รายงานปิดการขายไม่สำเร็จ. ตัวเลขตรงกับหน้า /reports/sales-unsuccessful. ✅ Use for: "เดือนที่แล้วปิดการขายไม่ได้กี่ราย", "ปิดการขายไม่ได้กี่ราย", "ปิดไม่สำเร็จกี่ราย". Returns unsuccessfulCount + totalQuotationValue + unsuccessfulLeads.
+6. get_marketing_dashboard: Marketing Dashboard — ตัวเลขตรงหน้า /marketing. ✅ Use for: ROAS, งบ Ads (Facebook/Google), ยิงแอด/งบแอด/ค่าแอด, Inbox จาก Ads, ค่า Ads/Lead, Lead ใหม่ Package/Wholesales, QT/PK-WH ออก QT/Win QT, Win Rate (QT), Conversion Rate (Lead). ⚠️ Do NOT use get_sales_closed for marketing dashboard metrics — use get_marketing_dashboard. Always send date_from and date_to.
+
+⚠️ MARKETING DASHBOARD (get_marketing_dashboard):
+- ROAS แสดงเป็น % (sales/ad_spend × 100) ไม่ใช่ multiplier
+- Conversion Rate (Lead) ใช้ leads จาก dashboard edge logic — ไม่ใช่ search_leads
+- Lead ใหม่ = มี contact + platform + created_at_thai ในช่วง
+- คำถามภาษาพูด: "ยิงแอด", "ยิงเอด", "งบแอดวันนี้", "โฆษณาใช้เงินเท่าไหร่" → get_marketing_dashboard
 
 Intent Classification:
 1. **db_query**: Any question about data in the system (leads, sales, KPI, appointments, team, statistics, lists, counts, summaries) → YOU MUST USE FUNCTION CALLING. No exception.
@@ -253,6 +260,7 @@ Examples:
 - "ทีมขาย" / "KPI ทีม" / "เดือนนี้เซลล์แต่ละคนขายได้กี่บาท" / "เซลแต่ละคนขายได้เท่าไหร่" → db_query (MUST use get_sales_team_overview)
 - "ยอดขายที่ปิดแล้ว" / "ขอยอดขาย" / "ยอดตามแพลตฟอร์ม" → db_query (MUST use get_sales_closed)
 - "แยก Package/Wholesales", "แยกรายการ", "อยากได้รายชื่อลูกค้า" (เมื่อถามตามหลังเรื่องยอดปิดการขาย/เดือน) → db_query (MUST use get_sales_closed กับช่วงวันที่จากข้อความก่อนหน้า เช่น ธันวา 2025 → date_from=2025-12-01, date_to=2025-12-31). ห้ามตอบจากความจำหรือข้อความก่อนหน้า — ต้องเรียก tool ทุกครั้งเพื่อดึงข้อมูลล่าสุด.
+- "ROAS เดือนนี้" / "งบ Facebook Ads" / "Marketing dashboard" / "Inbox จาก Ads" / "Win Rate QT" / "Conversion Rate" / "ค่า Ads ต่อ Lead" / "วันนี้ยิงแอดไปเท่าไหร่" / "งบแอดวันนี้" / "โฆษณาใช้เงินเท่าไหร่" → db_query (MUST use get_marketing_dashboard with date_from/date_to)
 """
 
 

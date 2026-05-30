@@ -3,6 +3,7 @@ node_modules/
 venv/
 env/
 .venv/
+.venv-test/
 __pycache__/
 *.pyc
 *.pyo

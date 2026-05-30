@@ -18,6 +18,7 @@ from app.tools.db_tools import (
     get_sales_docs,
     get_permit_requests
 )
+from app.tools.marketing_tools import get_marketing_dashboard
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -333,6 +334,42 @@ async def db_query_node(state: AIAssistantState) -> AIAssistantState:
                         tool_results.append({
                             "tool": "get_permit_requests",
                             "input": {"date_from": date_from, "date_to": date_to, "limit": limit},
+                            "output": result
+                        })
+
+                    elif tool_name == "get_marketing_dashboard":
+                        date_from = params.get("date_from")
+                        date_to = params.get("date_to")
+                        metric_focus = params.get("metric_focus", "all")
+                        if not date_from or not date_to:
+                            try:
+                                from app.utils.date_extractor import extract_date_range
+                                df, dt = extract_date_range(user_message)
+                                if df and dt:
+                                    date_from = date_from or df
+                                    date_to = date_to or dt
+                                    logger.info(
+                                        f"   📅 Backfill date range for get_marketing_dashboard: "
+                                        f"{date_from} to {date_to}"
+                                    )
+                            except Exception as e:
+                                logger.warning(
+                                    f"   ⚠️ Failed to backfill date range for get_marketing_dashboard: {e}"
+                                )
+                        result = await get_marketing_dashboard(
+                            date_from=date_from,
+                            date_to=date_to,
+                            metric_focus=metric_focus,
+                            user_id=user_id,
+                            user_role=user_role,
+                        )
+                        tool_results.append({
+                            "tool": "get_marketing_dashboard",
+                            "input": {
+                                "date_from": date_from,
+                                "date_to": date_to,
+                                "metric_focus": metric_focus,
+                            },
                             "output": result
                         })
                     

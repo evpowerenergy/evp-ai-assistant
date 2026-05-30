@@ -76,10 +76,26 @@ User ส่งข้อความ
 | | `get_quotations` | ใบเสนอราคา |
 | **Other** | `get_permit_requests` | คำขออนุญาต |
 | | `get_user_info` | ข้อมูล user |
+| **Marketing** | `get_marketing_dashboard` | Marketing Dashboard (/marketing): ROAS, งบ Ads (Facebook/Google), Inbox จาก Ads, ค่า Ads/Lead, Lead ใหม่ Package/Wholesales, Win Rate (QT), Conversion Rate (Lead), ยอดขายแยก Package/Wholesales |
 
 **การเลือก tool จริง:**  
-LLM ได้รับ **TOOL_SCHEMAS** (ชื่อ + description + parameters) ใน `llm_router.py` แล้วใช้ **function calling** เลือก tool และส่ง arguments (เช่น `query`, `date_from`, `date_to`, `status`).  
-โหนด **db_query_node** รับ `selected_tools` + `tool_parameters` จาก state แล้วไป map เรียกฟังก์ชันใน `db_tools.py` ตามชื่อ tool。
+LLM ได้รับ **TOOL_SCHEMAS** (ชื่อ + description + parameters) ใน `llm_router.py` แล้วใช้ **function calling** เลือก tool และส่ง arguments (เช่น `query`, `date_from`, `date_to`, `status`).
+
+**Keyword fallback (สำรอง):** ถ้า LLM ตอบ `general` โดยไม่เลือก tool แต่ข้อความมี keyword ที่เกี่ยวกับข้อมูล → `_suggest_default_tool_for_data_request()` จะ inject tool อัตโนมัติ
+
+**Marketing keywords** (`DATA_KEYWORDS_MARKETING` ใน `llm_router.py`):
+- ทั่วไป: `marketing`, `marketing dashboard`, `หน้า marketing`, `ยอดขาย marketing`
+- Ads: `งบ ads`, `งบโฆษณา`, `facebook ads`, `google ads`, `โฆษณา`, `แคมเปญ`
+- Metrics: `roas`, `inbox จาก ads`, `conversion rate`, `win rate`, `ค่า ads / lead`
+- Lead/QT: `lead ใหม่ package`, `lead ใหม่ wholesales`, `pk ออก qt`, `wh ออก qt`
+
+Marketing ถูกเช็ค **ก่อน** team KPI เพราะคำว่า `dashboard` ซ้ำกัน
+
+**Date backfill:** `get_marketing_dashboard` ต้องการ `date_from`/`date_to` — ถ้า LLM ไม่ส่ง ระบบจะ auto-extract จากข้อความ (เช่น "เดือนนี้", "วันนี้") ใน `llm_router.py` และ `db_query.py`
+
+**ที่เรียกข้อมูล:** `app/tools/marketing_tools.py` → Edge Function `marketing-dashboard-summary` (ตัวเลขตรงหน้า /marketing)
+
+โหนด **db_query_node** รับ `selected_tools` + `tool_parameters` จาก state แล้วไป map เรียกฟังก์ชันใน `db_tools.py` / `marketing_tools.py` ตามชื่อ tool。
 
 ---
 
@@ -128,7 +144,7 @@ LLM ได้รับ **TOOL_SCHEMAS** (ชื่อ + description + parameters
 | คำถาม | คำตอบ |
 |--------|--------|
 | **เลือกยังไงว่าจะดึงข้อมูลจากไหน?** | ใช้ **LLM (OpenAI)** วิเคราะห์ intent และ **function calling** เลือก tools จาก TOOL_SCHEMAS |
-| **เครื่องมือดึงข้อมูลมีอะไรบ้าง?** | **(1) DB:** RPC ผ่าน `db_tools.py` (search_leads, get_team_kpi, get_appointments ฯลฯ) **(2) เอกสาร:** RAG ผ่าน `rag_tools.py` (vector search) **(3) ไม่ดึง:** direct_answer (LLM + วันที่/เวลา) |
+| **เครื่องมือดึงข้อมูลมีอะไรบ้าง?** | **(1) DB:** RPC ผ่าน `db_tools.py` (search_leads, get_team_kpi, get_appointments ฯลฯ) **(2) Marketing:** Edge Function ผ่าน `marketing_tools.py` (get_marketing_dashboard) **(3) เอกสาร:** RAG ผ่าน `rag_tools.py` (vector search) **(4) ไม่ดึง:** direct_answer (LLM + วันที่/เวลา) |
 | **พารามิเตอร์ของ tool (วันที่, status ฯลฯ) มาจากไหน?** | LLM ส่งมาจากข้อความ User ผ่าน **tool_parameters** ใน function call |
 | **ถ้าผลลัพธ์ว่างหรือไม่พอ?** | **result_grader** ส่งให้ **rpc_planner** ปรับพารามิเตอร์ แล้ว **retry db_query** |
 

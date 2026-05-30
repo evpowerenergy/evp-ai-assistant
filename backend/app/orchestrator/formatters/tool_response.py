@@ -703,6 +703,89 @@ def format_tool_response(
             else:
                 responses.append("ไม่พบข้อมูลประสิทธิภาพการขาย")
 
+        elif tool_name == "get_marketing_dashboard":
+            if output.get("success") and output.get("data"):
+                data = output.get("data", {})
+                meta = data.get("meta", {})
+                focus = (output.get("metric_focus") or "all").lower()
+                df = output.get("date_from") or meta.get("dateFrom", "")[:10]
+                dt = output.get("date_to") or meta.get("dateTo", "")[:10]
+                period = f"ช่วง {df} ถึง {dt}" if df and dt else "ช่วงที่ระบุ"
+
+                def _fmt_money(v: Any) -> str:
+                    if v is None:
+                        return "ไม่มีข้อมูล"
+                    return f"฿{float(v):,.2f}"
+
+                def _fmt_num(v: Any) -> str:
+                    if v is None:
+                        return "ไม่มีข้อมูล"
+                    return f"{float(v):,.0f}"
+
+                def _fmt_pct(v: Any) -> str:
+                    if v is None:
+                        return "ไม่มีข้อมูล"
+                    return f"{float(v):.1f}%"
+
+                lines: List[str] = [f"Marketing Dashboard ({period}) — ตัวเลขตรงหน้า /marketing"]
+
+                pkg = data.get("package", {})
+                wh = data.get("wholesales", {})
+                fb = data.get("facebookAds", {})
+                gg = data.get("googleAds", {})
+                inbox = data.get("inboxBreakdown", {})
+
+                if focus in ("all", "sales"):
+                    lines.extend([
+                        "",
+                        "ยอดขายและ Conversion:",
+                        f"- ยอดขายทั้งหมด: {_fmt_num(data.get('totalSales'))}",
+                        f"- Package ยอดขาย: {_fmt_num(pkg.get('sales'))} | Lead ใหม่: {_fmt_num(pkg.get('newLeads'))}",
+                        f"- Package QT ทั้งหมด: {_fmt_num(pkg.get('totalQtDocuments'))} | PK ออก QT: {_fmt_num(pkg.get('pkOutQt'))} | Win QT: {_fmt_num(pkg.get('win'))}",
+                        f"- Package Win Rate (QT): {_fmt_pct(pkg.get('winRateQt'))} | Conversion Rate (Lead): {_fmt_pct(pkg.get('conversionRate'))}",
+                        f"- Wholesales ยอดขาย: {_fmt_num(wh.get('sales'))} | Lead ใหม่: {_fmt_num(wh.get('newLeads'))}",
+                        f"- Wholesales QT ทั้งหมด: {_fmt_num(wh.get('totalQtDocuments'))} | WH ออก QT: {_fmt_num(wh.get('whOutQt'))} | Win QT: {_fmt_num(wh.get('winQt'))}",
+                        f"- Wholesales Win Rate (QT): {_fmt_pct(wh.get('winRateQt'))} | Conversion Rate (Lead): {_fmt_pct(wh.get('conversionRate'))}",
+                    ])
+
+                if focus in ("all", "ads"):
+                    fb_ok = meta.get("facebookApiConnected", False)
+                    lines.extend([
+                        "",
+                        "งบ Ads:",
+                        f"- งบ Ads ทั้งหมด: {_fmt_money(data.get('totalAdBudget'))}",
+                        f"- Facebook Ads: {_fmt_money(fb.get('total')) if fb_ok else 'ไม่สามารถดึงข้อมูลได้'}",
+                        f"  · Package: {_fmt_money(fb.get('package'))} | Wholesales: {_fmt_money(fb.get('wholesales'))} | อื่นๆ: {_fmt_money(fb.get('others'))}",
+                        f"- Google Ads: {_fmt_money(gg.get('total'))}",
+                        f"- ค่า Ads / Lead: {_fmt_num(data.get('adCostPerLead'))} | Lead ใหม่ทั้งหมด: {_fmt_num(data.get('totalNewLeads'))}",
+                    ])
+
+                if focus in ("all", "inbox"):
+                    fb_ok = meta.get("facebookApiConnected", False)
+                    lines.extend([
+                        "",
+                        "Inbox จาก Ads:",
+                        f"- Inbox ทั้งหมด: {_fmt_num(data.get('totalInboxFromAds')) if fb_ok else 'ไม่สามารถดึงข้อมูลได้'}",
+                        f"- Package ข้อความ: {_fmt_num(inbox.get('packageMessages'))} | ต้นทุน/ข้อความ: {_fmt_money(inbox.get('packageCostPerMessage'))}",
+                        f"- Wholesales ข้อความ: {_fmt_num(inbox.get('wholesalesMessages'))} | ต้นทุน/ข้อความ: {_fmt_money(inbox.get('wholesalesCostPerMessage'))}",
+                        f"- อื่นๆ ข้อความ: {_fmt_num(inbox.get('otherMessages'))} | ต้นทุน/ข้อความ: {_fmt_money(inbox.get('otherCostPerMessage'))}",
+                    ])
+
+                if focus in ("all", "roas"):
+                    lines.extend([
+                        "",
+                        "ROAS (% Return on Ad Spend):",
+                        f"- Overall ROAS: {_fmt_pct(data.get('overallRoas'))}",
+                        f"- Package ROAS: {_fmt_pct(data.get('packageRoas'))}",
+                        f"- Wholesales ROAS: {_fmt_pct(data.get('wholesalesRoas'))}",
+                    ])
+
+                responses.append("\n".join(lines))
+            elif output.get("error"):
+                responses.append(f"เกิดข้อผิดพลาด Marketing Dashboard: {output.get('error')}")
+            else:
+                responses.append("ไม่พบข้อมูล Marketing Dashboard ในช่วงเวลาที่ระบุ")
+
         elif tool_name in ["get_sales_docs", "get_permit_requests"]:
             if output.get("success"):
                 data = output.get("data", {})

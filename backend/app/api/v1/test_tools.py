@@ -12,6 +12,7 @@ from app.tools.db_tools import (
     get_customer_info,
     get_team_kpi
 )
+from app.tools.marketing_tools import get_marketing_dashboard
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -97,11 +98,27 @@ async def test_tools(
         elif request.tool_name == "get_team_kpi":
             team_id = request.parameters.get("team_id")
             result = await get_team_kpi(user_id, team_id)
+
+        elif request.tool_name == "get_marketing_dashboard":
+            date_from = request.parameters.get("date_from")
+            date_to = request.parameters.get("date_to")
+            if not date_from or not date_to:
+                raise HTTPException(
+                    status_code=400,
+                    detail="date_from and date_to are required (YYYY-MM-DD)",
+                )
+            result = await get_marketing_dashboard(
+                date_from=date_from,
+                date_to=date_to,
+                metric_focus=request.parameters.get("metric_focus", "all"),
+                user_id=user_id,
+                user_role=user_role,
+            )
         
         else:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unknown tool: {request.tool_name}. Available: search_leads, get_daily_summary, get_customer_info, get_team_kpi"
+                detail=f"Unknown tool: {request.tool_name}. Available: search_leads, get_daily_summary, get_customer_info, get_team_kpi, get_marketing_dashboard"
             )
         
         logger.info(f"✅ Tool executed successfully")
@@ -182,6 +199,23 @@ async def list_available_tools():
                 "tool_name": "get_team_kpi",
                 "parameters": {
                     "team_id": 1
+                }
+            }
+        },
+        {
+            "name": "get_marketing_dashboard",
+            "description": "Marketing Dashboard summary (same as /marketing page)",
+            "parameters": {
+                "date_from": "string (required) - YYYY-MM-DD",
+                "date_to": "string (required) - YYYY-MM-DD",
+                "metric_focus": "string (optional) - all|sales|ads|inbox|roas"
+            },
+            "example": {
+                "tool_name": "get_marketing_dashboard",
+                "parameters": {
+                    "date_from": "2026-03-01",
+                    "date_to": "2026-03-30",
+                    "metric_focus": "all"
                 }
             }
         }

@@ -41,13 +41,63 @@ DATA_KEYWORDS_SALES_UNSUCCESSFUL = (
 DATA_KEYWORDS_QUOTATIONS = ("ใบเสนอราคา", "quotation", "โควต้า", "quotations", "qt", "ใบ qt")
 DATA_KEYWORDS_DOCS = ("เอกสารการขาย", "ใบแจ้งหนี้", "invoice", "เอกสาร")
 DATA_KEYWORDS_PERMITS = ("คำขออนุญาต", "permit", "อนุญาต")
+DATA_KEYWORDS_MARKETING = (
+    "marketing dashboard", "marketing", "แดชบอร์ด marketing", "ระบบ marketing",
+    "หน้า marketing", "ยอดขาย marketing",
+    "งบ ads", "งบโฆษณา", "งบแอด", "ค่าแอด", "ค่า ads",
+    "facebook ads", "google ads", "fb ads", "fbads", "googleads",
+    "facebookads", "googleads",
+    "โฆษณา", "แคมเปญ", "แอดโฆษณา",
+    "ยิงแอด", "ยิง ads", "ยิงเอด",
+    "roas", "return on ad spend", "inbox จาก ads", "inbox",
+    "conversion rate", "win rate", "ค่า ads / lead", "cost per lead",
+    "pk ออก qt", "wh ออก qt", "lead ใหม่ package", "lead ใหม่ wholesales",
+    "ต้นทุนต่อข้อความ",
+)
+# Thai marketing slang / phrasing not covered by simple substring keywords
+MARKETING_QUERY_PATTERNS = (
+    re.compile(r"ยิง\s*(แอด|เอด|ads)", re.IGNORECASE),
+    re.compile(r"งบ\s*(แอด|เอด|ads)", re.IGNORECASE),
+    re.compile(r"ค่า\s*(แอด|เอด|ads)", re.IGNORECASE),
+    re.compile(r"(แอด|เอด|ads|โฆษณา).*(งบ|ค่า|เท่าไหร่|ใช้เงิน|ไป)", re.IGNORECASE),
+    re.compile(r"(งบ|ค่า|ใช้เงิน|เท่าไหร่).*(แอด|เอด|ads|โฆษณา)", re.IGNORECASE),
+)
 # Union of all data-related keywords for "any match" check
 _DATA_KEYWORDS_ALL = (
     DATA_KEYWORDS_LEADS + DATA_KEYWORDS_APPOINTMENTS + DATA_KEYWORDS_TEAM_KPI
     + DATA_KEYWORDS_SALES_BY_MEMBER
     + DATA_KEYWORDS_SALES_CLOSED + DATA_KEYWORDS_SALES_UNSUCCESSFUL
     + DATA_KEYWORDS_QUOTATIONS + DATA_KEYWORDS_DOCS + DATA_KEYWORDS_PERMITS
+    + DATA_KEYWORDS_MARKETING
 )
+
+
+def _normalize_message_for_keywords(user_message: str) -> str:
+    """Normalize Thai typos/variants before keyword matching."""
+    m = (user_message or "").lower().strip()
+    # Common Thai typo: double เ (เเ) instead of เ
+    return m.replace("เเ", "เ")
+
+
+def _is_marketing_query(normalized_message: str) -> bool:
+    """True if message asks for marketing dashboard metrics (ads spend, ROAS, etc.)."""
+    if any(k in normalized_message for k in DATA_KEYWORDS_MARKETING):
+        return True
+    return any(p.search(normalized_message) for p in MARKETING_QUERY_PATTERNS)
+
+
+def _extract_date_params_from_message(user_message: str) -> Dict[str, str]:
+    """Extract date_from/date_to from natural language for date-required tools."""
+    if not (user_message or "").strip():
+        return {}
+    try:
+        from app.utils.date_extractor import extract_date_range
+        df, dt = extract_date_range(user_message)
+        if df and dt:
+            return {"date_from": df, "date_to": dt}
+    except Exception:
+        pass
+    return {}
 
 
 def _suggest_default_tool_for_data_request(user_message: str) -> Optional[Dict[str, Any]]:
@@ -57,7 +107,7 @@ def _suggest_default_tool_for_data_request(user_message: str) -> Optional[Dict[s
     """
     if not (user_message or "").strip():
         return None
-    m = user_message.lower().strip()
+    m = _normalize_message_for_keywords(user_message)
     # "ลูกค้าใหม่กี่ราย" / "ลีดใหม่กี่ราย" = นับจาก lead ที่สร้างในช่วง → search_leads (ไม่ใช่ get_sales_closed)
     if ("ลูกค้าใหม่" in m or "ลีดใหม่" in m) and "ปิดการขาย" not in m:
         return {"name": "search_leads", "parameters": {"query": user_message.strip()}}
@@ -71,6 +121,12 @@ def _suggest_default_tool_for_data_request(user_message: str) -> Optional[Dict[s
         return {"name": "get_sales_closed", "parameters": {}}
     if any(k in m for k in DATA_KEYWORDS_APPOINTMENTS):
         return {"name": "get_appointments", "parameters": {}}
+    # Marketing before TEAM_KPI — "dashboard" overlaps with team KPI keywords
+    if _is_marketing_query(m):
+        return {
+            "name": "get_marketing_dashboard",
+            "parameters": _extract_date_params_from_message(user_message),
+        }
     if any(k in m for k in DATA_KEYWORDS_TEAM_KPI):
         return {"name": "get_sales_team_overview", "parameters": {}}
     if any(k in m for k in DATA_KEYWORDS_QUOTATIONS) or re.search(r"\bqt\d{6,}\b", m, flags=re.IGNORECASE):
@@ -88,7 +144,9 @@ def _message_has_data_keyword(user_message: str) -> bool:
     """True if the message contains any keyword that suggests a request for system data."""
     if not (user_message or "").strip():
         return False
-    m = user_message.lower()
+    m = _normalize_message_for_keywords(user_message)
+    if _is_marketing_query(m):
+        return True
     return any(kw in m for kw in _DATA_KEYWORDS_ALL) or bool(re.search(r"\bqt\d{6,}\b", m, flags=re.IGNORECASE))
 
 
@@ -381,6 +439,34 @@ TOOL_SCHEMAS = [
                 "required": []
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_marketing_dashboard",
+            "description": "Marketing Dashboard summary — ตัวเลขตรงหน้า /marketing. ✅ Use for: ROAS, งบ Ads (Facebook/Google), ยิงแอด/งบแอด/ค่าแอด, Inbox จาก Ads, ค่า Ads/Lead, Lead ใหม่ (Package/Wholesales), QT ที่ออก/PK-WH ออก QT/Win QT, Win Rate (QT), Conversion Rate (Lead), ยอดขายแยก Package/Wholesales. ⚠️ Do NOT use get_sales_closed for marketing metrics — use this tool. Always send date_from and date_to when user mentions a period.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_from": {
+                        "type": "string",
+                        "description": "Start date YYYY-MM-DD (required when user mentions dates)",
+                        "format": "date"
+                    },
+                    "date_to": {
+                        "type": "string",
+                        "description": "End date YYYY-MM-DD (required when user mentions dates)",
+                        "format": "date"
+                    },
+                    "metric_focus": {
+                        "type": "string",
+                        "description": "Optional focus: all, sales, ads, inbox, roas",
+                        "enum": ["all", "sales", "ads", "inbox", "roas"]
+                    }
+                },
+                "required": []
+            }
+        }
     }
 ]
 
@@ -475,6 +561,10 @@ Available tools (ALWAYS use function calling for data queries):
 === PERMITS (1 tool) ===
 11. get_permit_requests - For permit requests (คำขออนุญาต)
     Use when: User asks about permit requests or permits
+
+=== MARKETING (1 tool) ===
+12. get_marketing_dashboard - For Marketing Dashboard (/marketing): ROAS, งบ Ads, ยิงแอด/งบแอด, Inbox, Lead ใหม่, Win Rate, Conversion Rate
+    Use when: User asks about marketing dashboard metrics including Thai phrasing like "ยิงแอด", "งบแอดวันนี้", "โฆษณาใช้เงินเท่าไหร่". Do NOT use get_sales_closed for these.
 
 === IMPORTANT: INVENTORY-RELATED FUNCTIONS (NOT AVAILABLE) ===
 ⚠️  The following functions are NOT available for AI Chatbot (inventory system not in use):
@@ -624,16 +714,25 @@ Available tools (ALWAYS use function calling for data queries):
                 elif tool_name == "get_sales_team_overview":
                     # Ensure date range is extracted for period-based questions like
                     # "เดือนนี้", "เดือนที่แล้ว", "สัปดาห์นี้", etc.
-                    if "date_from" not in tool_call_params or "date_to" not in tool_call_params:
-                        try:
-                            from app.utils.date_extractor import extract_date_range
-                            df, dt = extract_date_range(user_message)
-                            if df and dt:
-                                tool_call_params.setdefault("date_from", df)
-                                tool_call_params.setdefault("date_to", dt)
-                                logger.info(f"   📅 Auto-extracted date range for get_sales_team_overview: {df} to {dt}")
-                        except Exception as e:
-                            logger.warning(f"   ⚠️ Failed to auto-extract date range for get_sales_team_overview: {e}")
+                    if not tool_call_params.get("date_from") or not tool_call_params.get("date_to"):
+                        date_params = _extract_date_params_from_message(user_message)
+                        if date_params:
+                            tool_call_params.setdefault("date_from", date_params["date_from"])
+                            tool_call_params.setdefault("date_to", date_params["date_to"])
+                            logger.info(
+                                f"   📅 Auto-extracted date range for get_sales_team_overview: "
+                                f"{date_params['date_from']} to {date_params['date_to']}"
+                            )
+                elif tool_name == "get_marketing_dashboard":
+                    if not tool_call_params.get("date_from") or not tool_call_params.get("date_to"):
+                        date_params = _extract_date_params_from_message(user_message)
+                        if date_params:
+                            tool_call_params.setdefault("date_from", date_params["date_from"])
+                            tool_call_params.setdefault("date_to", date_params["date_to"])
+                            logger.info(
+                                f"   📅 Auto-extracted date range for get_marketing_dashboard: "
+                                f"{date_params['date_from']} to {date_params['date_to']}"
+                            )
                 elif tool_name == "get_sales_docs":
                     if "query" not in tool_call_params:
                         tool_call_params["query"] = user_message
