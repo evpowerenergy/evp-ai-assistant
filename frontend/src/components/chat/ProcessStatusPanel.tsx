@@ -22,9 +22,10 @@ interface ProcessStatusPanelProps {
   debugPrecompute?: Record<string, any> | null
   loadingHistory?: boolean
   modelConfig?: ConfigInfo | null
+  chatMode?: 'crm' | 'kb'
 }
 
-export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults, debugPrecompute, loadingHistory, modelConfig }: ProcessStatusPanelProps) {
+export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults, debugPrecompute, loadingHistory, modelConfig, chatMode }: ProcessStatusPanelProps) {
   const [elapsedTime, setElapsedTime] = useState(0)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
@@ -86,6 +87,8 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
 
   const getStepName = (step: string) => {
     const stepNames: Record<string, string> = {
+      mode_gate: 'เลือกโหมดแชท',
+      kb_guard: 'ตรวจสอบโหมดเอกสาร',
       router: 'วิเคราะห์ Intent',
       db_query: 'ดึงข้อมูลจาก Database',
       rag_query: 'ค้นหาเอกสาร',
@@ -206,6 +209,11 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
           </p>
         )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+          {chatMode && (
+            <span className="font-medium text-foreground">
+              โหมด: {chatMode === 'crm' ? 'CRM' : 'เอกสารบริษัท'}
+            </span>
+          )}
           {runtime !== undefined && (
             <span className="font-medium text-foreground">Runtime: {formatTime(runtime)}</span>
           )}

@@ -273,3 +273,8 @@ BEGIN
         ON CONFLICT DO NOTHING;
     END IF;
 END $$;
+
+-- Chat mode preference (web + LINE)
+ALTER TABLE public.user_chat_preferences
+    ADD COLUMN IF NOT EXISTS chat_mode TEXT NOT NULL DEFAULT 'crm'
+        CHECK (chat_mode IN ('crm', 'kb'));

@@ -190,7 +190,8 @@ Analyze user messages and USE FUNCTION CALLING to select appropriate tools.
 {context}
 
 ⚠️ CRITICAL RULE — DATA QUESTIONS MUST USE FUNCTION CALLING:
-- **Any question about data in the system** (leads, customers, sales, KPI, appointments, team, statistics, ยอด, นัด, ทีม, ใบเสนอราคา, etc.) **MUST be classified as db_query and you MUST call the appropriate tool.** Never answer data questions with general knowledge only.
+- **Priority order:** (1) CRM data tools via function calling — ALWAYS first when the user asks for live data, counts, lists, KPI, leads, sales, marketing metrics. (2) RAG — ONLY for uploaded documents (SOP, policy, company reference) when there is NO live-data request. (3) general — greetings/definitions only.
+- **Never choose RAG over CRM tools** when the message could mean live system data (e.g. ลีดวันนี้, ยอดขาย, KPI ทีมขาย, งบแอด). When in doubt → use CRM tools.
 - **general** is ONLY for: greetings ("สวัสดี", "hello"), date/time ("วันนี้วันที่อะไร", "เวลาตอนนี้"), and pure vocabulary/definition questions ("ลีดคืออะไร", "Platform คืออะไร") where the user is NOT asking for current data or lists or counts from the system.
 - If the user asks for any list, count, summary, or current data (e.g. "ลีดวันนี้", "อยากดูลีด", "มีลีดไหม", "สรุปลีด", "นัดวันนี้", "ทีมขาย", "KPI", "ยอดขาย") → you MUST use function calling (db_query). No exception.
 
@@ -239,7 +240,7 @@ Available tools (ALWAYS use function calling for data queries):
 
 Intent Classification:
 1. **db_query**: Any question about data in the system (leads, sales, KPI, appointments, team, statistics, lists, counts, summaries) → YOU MUST USE FUNCTION CALLING. No exception.
-2. **rag_query**: Documentation/how-to questions ("how to", "ขั้นตอน", "procedure", "วิธีทำ")
+2. **rag_query**: Uploaded documents ONLY (SOP, policy, company reference). User should ask with clear KB intent: "ตามเอกสาร", "ข้อมูลอ้างอิง", "ข้อมูลพื้นฐาน", "ขั้นตอน", "นโยบาย". ⚠️ If the message could be live CRM data (ลีด, ยอดขาย, KPI ทีม, งบแอด, วันนี้/เดือนนี้) → db_query, NOT rag_query.
 3. **general**: ONLY these cases (no system data requested):
    - Greetings only: "สวัสดี", "hello", "hi"
    - Date/time only: "วันนี้วันที่อะไร", "เวลาตอนนี้"
@@ -261,6 +262,8 @@ Examples:
 - "ยอดขายที่ปิดแล้ว" / "ขอยอดขาย" / "ยอดตามแพลตฟอร์ม" → db_query (MUST use get_sales_closed)
 - "แยก Package/Wholesales", "แยกรายการ", "อยากได้รายชื่อลูกค้า" (เมื่อถามตามหลังเรื่องยอดปิดการขาย/เดือน) → db_query (MUST use get_sales_closed กับช่วงวันที่จากข้อความก่อนหน้า เช่น ธันวา 2025 → date_from=2025-12-01, date_to=2025-12-31). ห้ามตอบจากความจำหรือข้อความก่อนหน้า — ต้องเรียก tool ทุกครั้งเพื่อดึงข้อมูลล่าสุด.
 - "ROAS เดือนนี้" / "งบ Facebook Ads" / "Marketing dashboard" / "Inbox จาก Ads" / "Win Rate QT" / "Conversion Rate" / "ค่า Ads ต่อ Lead" / "วันนี้ยิงแอดไปเท่าไหร่" / "งบแอดวันนี้" / "โฆษณาใช้เงินเท่าไหร่" → db_query (MUST use get_marketing_dashboard with date_from/date_to)
+- "ข้อมูลพื้นฐานของบริษัท" / "เกี่ยวกับบริษัทมีอะไรบ้าง" / "วิสัยทัศน์พันธกิจ" / "ขั้นตอนการขอลา" / "นโยบายการลา" → rag_query (search uploaded documents; do NOT use CRM tools)
+- "รายละเอียด QT2026030013" / "ใบแจ้งหนี้เดือนนี้" → db_query (get_sales_docs; NOT rag_query even if word "เอกสาร" appears)
 """
 
 

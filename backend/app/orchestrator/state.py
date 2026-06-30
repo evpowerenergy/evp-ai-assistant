@@ -14,6 +14,7 @@ class AIAssistantState(TypedDict, total=False):
     user_id: str
     user_role: Optional[str]  # User role from JWT token (optional)
     session_id: Optional[str]
+    chat_mode: Optional[str]  # "crm" | "kb"
     
     # Chat history (NEW)
     chat_history: Optional[List[Dict[str, Any]]]  # Raw chat history from database

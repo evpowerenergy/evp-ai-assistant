@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import apiClient from '@/lib/api/client'
 import { useAuth } from '@/contexts/AuthContext'
+import type { ChatMode } from '@/components/chat/ChatModeToggle'
 
 // Simple logger for frontend
 const logger = {
@@ -39,7 +40,7 @@ export function useChat() {
   const { session } = useAuth()
 
   const sendMessage = useCallback(
-    async (content: string, sessionId: string) => {
+    async (content: string, sessionId: string, chatMode: ChatMode = 'crm') => {
       if (!session) {
         setError('Not authenticated')
         return
@@ -90,7 +91,7 @@ export function useChat() {
 
         // Use streaming if enabled
         if (useStreaming) {
-          await sendMessageStream(content, sessionId, session.access_token)
+          await sendMessageStream(content, sessionId, session.access_token, chatMode)
         } else {
           // Fallback to non-streaming
           const response = await apiClient.post(
@@ -98,6 +99,7 @@ export function useChat() {
             {
               message: content,
               session_id: sessionId,
+              chat_mode: chatMode,
             },
             {
               headers: {
@@ -144,7 +146,12 @@ export function useChat() {
     [session, useStreaming]
   )
 
-  const sendMessageStream = async (content: string, sessionId: string, token: string) => {
+  const sendMessageStream = async (
+    content: string,
+    sessionId: string,
+    token: string,
+    chatMode: ChatMode = 'crm'
+  ) => {
     const baseURL = apiClient.defaults.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     const response = await fetch(`${baseURL}/api/v1/chat/stream`, {
       method: 'POST',
@@ -155,6 +162,7 @@ export function useChat() {
       body: JSON.stringify({
         message: content,
         session_id: sessionId,
+        chat_mode: chatMode,
       }),
     })
 

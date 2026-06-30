@@ -75,6 +75,77 @@ def _headers() -> Dict[str, str]:
     }
 
 
+def _text_message_with_quick_reply(
+    text: str,
+    quick_reply_items: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    msg: Dict[str, Any] = {"type": "text", "text": text}
+    if quick_reply_items:
+        msg["quickReply"] = {"items": quick_reply_items[:13]}
+    return msg
+
+
+async def reply_message_with_quick_reply(
+    reply_token: str,
+    text: str,
+    quick_reply_items: Optional[List[Dict[str, Any]]] = None,
+) -> bool:
+    """Reply with optional Quick Reply items on the last message."""
+    if not settings.LINE_CHANNEL_ACCESS_TOKEN or not reply_token:
+        return False
+    chunks = split_text_for_line(text)[:5]
+    if not chunks:
+        return False
+    messages = [
+        _text_message_with_quick_reply(chunk, None if i < len(chunks) - 1 else quick_reply_items)
+        for i, chunk in enumerate(chunks)
+    ]
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                LINE_REPLY_URL,
+                headers=_headers(),
+                json={"replyToken": reply_token, "messages": messages},
+            )
+            if resp.status_code >= 400:
+                logger.error("LINE reply failed: %s %s", resp.status_code, resp.text)
+                return False
+            return True
+    except Exception as e:
+        logger.error("LINE reply error: %s", e)
+        return False
+
+
+async def push_message_with_quick_reply(
+    line_user_id: str,
+    text: str,
+    quick_reply_items: Optional[List[Dict[str, Any]]] = None,
+) -> bool:
+    """Push message with Quick Reply on the last chunk."""
+    if not settings.LINE_CHANNEL_ACCESS_TOKEN or not line_user_id:
+        return False
+    try:
+        chunks = split_text_for_line(text)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for i, chunk in enumerate(chunks):
+                items = quick_reply_items if i == len(chunks) - 1 else None
+                resp = await client.post(
+                    LINE_PUSH_URL,
+                    headers=_headers(),
+                    json={
+                        "to": line_user_id,
+                        "messages": [_text_message_with_quick_reply(chunk, items)],
+                    },
+                )
+                if resp.status_code >= 400:
+                    logger.error("LINE push failed: %s %s", resp.status_code, resp.text)
+                    return False
+        return True
+    except Exception as e:
+        logger.error("LINE push error: %s", e)
+        return False
+
+
 async def reply_message(reply_token: str, text: str) -> bool:
     """Reply to a webhook event (must be within ~1 minute)."""
     if not settings.LINE_CHANNEL_ACCESS_TOKEN or not reply_token:
@@ -209,7 +280,8 @@ async def send_line_message(
     quick_replies: Optional[list] = None,
 ) -> bool:
     """Send message via LINE Push API."""
-    _ = quick_replies  # reserved for future Quick Reply items
+    if quick_replies:
+        return await push_message_with_quick_reply(user_id, message, quick_replies)
     return await push_message(user_id, message)
 
 

@@ -10,6 +10,7 @@ from app.core.audit import log_chat_request, log_tool_call
 from app.orchestrator.graph import process_message
 from app.orchestrator.state import AIAssistantState
 from app.services.active_session import touch_session
+from app.services.chat_mode import get_chat_mode, normalize_chat_mode
 from app.services.chat_history import (
     format_history_for_llm,
     load_chat_history,
@@ -27,6 +28,7 @@ async def run_chat_turn(
     session_id: str,
     source: str = "web",
     line_user_id: Optional[str] = None,
+    chat_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Run one AI chat turn: load history, process_message, save messages, audit.
@@ -37,11 +39,15 @@ async def run_chat_turn(
     )
 
     start_time = time.time()
+    resolved_mode = (
+        normalize_chat_mode(chat_mode) if chat_mode else await get_chat_mode(user_id)
+    )
     initial_state: AIAssistantState = {
         "user_message": message,
         "user_id": user_id,
         "user_role": user_role,
         "session_id": session_id,
+        "chat_mode": resolved_mode,
         "chat_history": chat_history,
         "history_context": history_context,
         "intent": None,
@@ -65,7 +71,7 @@ async def run_chat_turn(
     result_state = await process_message(initial_state)
     runtime = time.time() - start_time
 
-    user_meta: Dict[str, Any] = {"source": source}
+    user_meta: Dict[str, Any] = {"source": source, "chat_mode": resolved_mode}
     if line_user_id:
         user_meta["line_user_id"] = line_user_id
 
@@ -81,6 +87,7 @@ async def run_chat_turn(
         content=result_state.get("response", ""),
         metadata={
             "source": source,
+            "chat_mode": resolved_mode,
             "intent": result_state.get("intent"),
             "citations": result_state.get("citations", []),
             "tool_calls": result_state.get("tool_calls", []),
@@ -112,6 +119,7 @@ async def run_chat_turn(
         "tool_calls": result_state.get("tool_calls"),
         "tool_results": result_state.get("tool_results", []),
         "intent": result_state.get("intent"),
+        "chat_mode": resolved_mode,
         "runtime": runtime,
         "debug_precompute": result_state.get("debug_precompute"),
     }

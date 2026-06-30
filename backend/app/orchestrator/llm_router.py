@@ -39,7 +39,7 @@ DATA_KEYWORDS_SALES_UNSUCCESSFUL = (
     "เดือนที่แล้วปิดไม่ได้", "กี่รายที่ปิดไม่ได้",
 )
 DATA_KEYWORDS_QUOTATIONS = ("ใบเสนอราคา", "quotation", "โควต้า", "quotations", "qt", "ใบ qt")
-DATA_KEYWORDS_DOCS = ("เอกสารการขาย", "ใบแจ้งหนี้", "invoice", "เอกสาร")
+DATA_KEYWORDS_DOCS = ("เอกสารการขาย", "ใบแจ้งหนี้", "invoice")
 DATA_KEYWORDS_PERMITS = ("คำขออนุญาต", "permit", "อนุญาต")
 DATA_KEYWORDS_MARKETING = (
     "marketing dashboard", "marketing", "แดชบอร์ด marketing", "ระบบ marketing",
@@ -148,6 +148,62 @@ def _message_has_data_keyword(user_message: str) -> bool:
     if _is_marketing_query(m):
         return True
     return any(kw in m for kw in _DATA_KEYWORDS_ALL) or bool(re.search(r"\bqt\d{6,}\b", m, flags=re.IGNORECASE))
+
+
+# --- Routing priority (do not invert) ---
+# 1. CRM data tools (search_leads, get_sales_closed, ...) — highest priority
+# 2. RAG (uploaded documents) — only when explicit KB/SOP intent AND no CRM signal
+# 3. general — greetings, definitions, or ambiguous questions
+
+# Explicit uploaded-document intent (no overlap with CRM tool vocabulary).
+RAG_EXPLICIT_DOC_MARKERS = (
+    "ในเอกสาร", "ตามเอกสาร", "จากเอกสาร", "จากคู่มือ", "ในระบบเอกสาร",
+    "อ่านจากเอกสาร", "ข้อมูลอ้างอิง", "ฐานข้อมูลอ้างอิง", "company reference",
+    "knowledge base", "ใน knowledge",
+)
+
+# SOP / policy / how-to (typical KB uploads).
+RAG_SOP_POLICY_MARKERS = (
+    "ขั้นตอน", "วิธีทำ", "วิธีใช้", "sop", "นโยบาย", "คู่มือ",
+    "procedure", "how to", "แนวทาง", "กระบวนการ", "onboarding",
+    "ตามนโยบาย", "ตาม sop",
+)
+
+# Company profile from uploaded reference doc — narrow; avoid CRM terms (ทีม, ลีด, kpi, ยอด, marketing).
+RAG_COMPANY_PROFILE_MARKERS = (
+    "ข้อมูลพื้นฐาน", "company profile",
+    "เกี่ยวกับบริษัท", "ประวัติบริษัท", "วิสัยทัศน์", "พันธกิจ",
+)
+
+RAG_KEYWORDS = RAG_EXPLICIT_DOC_MARKERS + RAG_SOP_POLICY_MARKERS + RAG_COMPANY_PROFILE_MARKERS
+
+# Live CRM-style time/count signals — never route to RAG.
+_LIVE_DATA_BLOCKERS = (
+    "วันนี้", "เมื่อวาน", "สัปดาห์นี้", "เดือนนี้", "เดือนที่แล้ว", "ปีนี้",
+    "กี่ราย", "กี่บาท", "สรุปยอด", "รายงาน",
+    "today", "yesterday", "this week", "this month", "last month",
+)
+
+
+def _message_has_live_data_intent(user_message: str) -> bool:
+    """True if the message likely asks for live/current CRM metrics."""
+    m = _normalize_message_for_keywords(user_message)
+    return any(sig in m for sig in _LIVE_DATA_BLOCKERS)
+
+
+def _message_has_rag_keyword(user_message: str) -> bool:
+    """True if the message should search uploaded knowledge-base documents.
+
+    CRM data tools always win: any CRM keyword or live-data signal → not RAG.
+    """
+    if not (user_message or "").strip():
+        return False
+    if _message_has_data_keyword(user_message):
+        return False
+    if _message_has_live_data_intent(user_message):
+        return False
+    m = _normalize_message_for_keywords(user_message)
+    return any(kw in m for kw in RAG_KEYWORDS)
 
 
 # Define tool schemas for LLM function calling
@@ -476,7 +532,8 @@ async def analyze_intent_with_llm(
     user_id: str,
     user_role: str = "staff",
     session_context: Optional[Dict[str, Any]] = None,
-    history_context: Optional[str] = None  # NEW: Chat history context
+    history_context: Optional[str] = None,
+    chat_mode: Optional[str] = "crm",
 ) -> Dict[str, Any]:
     """
     Use LLM with function calling to analyze intent and select tools
@@ -655,15 +712,24 @@ Available tools (ALWAYS use function calling for data queries):
         )
         is_sales_data_query = any(m in message_lower for m in sales_doc_markers)
 
-        rag_markers = (
-            "ขั้นตอน", "วิธีทำ", "วิธีใช้", "sop", "นโยบาย", "คู่มือ",
-            "procedure", "how to", "แนวทาง", "กระบวนการ", "onboarding",
-        )
-        is_rag_style = any(m in message_lower for m in rag_markers) or (
-            "document" in content and not is_sales_data_query
-        )
+        crm_only = (chat_mode or "crm").lower() != "kb"
+        is_rag_style = False
+        if not crm_only:
+            is_rag_style = _message_has_rag_keyword(user_message) or (
+                "document" in content
+                and not is_sales_data_query
+                and not _message_has_data_keyword(user_message)
+                and not _message_has_live_data_intent(user_message)
+            )
 
-        if not tool_calls and is_rag_style and not is_sales_data_query:
+        if (
+            not crm_only
+            and not tool_calls
+            and not _message_has_data_keyword(user_message)
+            and not _message_has_live_data_intent(user_message)
+            and is_rag_style
+            and not is_sales_data_query
+        ):
             intent = "rag_query"
             confidence = 0.85
         elif not tool_calls and ("unclear" in content or "clarify" in content or len(user_message.strip()) < 5):
@@ -783,16 +849,26 @@ Available tools (ALWAYS use function calling for data queries):
             "tool_parameters": tool_parameters
         }
         
-        # Data-keyword fallback: if LLM returned general with no tools but message clearly asks for system data,
-        # override to db_query and inject a default tool so we still fetch data (user expects data regardless of phrasing).
-        if result["intent"] == "general" and not result["selected_tools"] and _message_has_data_keyword(user_message):
-            suggested = _suggest_default_tool_for_data_request(user_message)
-            if suggested:
-                result["intent"] = "db_query"
+        # Fallback priority: CRM data tools FIRST, then RAG (never override CRM).
+        if result["intent"] == "general" and not result["selected_tools"]:
+            if _message_has_data_keyword(user_message) or _message_has_live_data_intent(user_message):
+                suggested = _suggest_default_tool_for_data_request(user_message)
+                if suggested:
+                    result["intent"] = "db_query"
+                    result["confidence"] = 0.85
+                    result["selected_tools"] = [{"name": suggested["name"], "parameters": suggested["parameters"]}]
+                    result["tool_parameters"] = {suggested["name"]: suggested["parameters"]}
+                    logger.info(
+                        f"   📌 Data-keyword fallback: overriding to db_query with tool={suggested['name']}"
+                    )
+            elif not crm_only and _message_has_rag_keyword(user_message):
+                result["intent"] = "rag_query"
                 result["confidence"] = 0.85
-                result["selected_tools"] = [{"name": suggested["name"], "parameters": suggested["parameters"]}]
-                result["tool_parameters"] = {suggested["name"]: suggested["parameters"]}
-                logger.info(f"   📌 Data-keyword fallback: overriding to db_query with tool={suggested['name']} (user message suggests data request)")
+                logger.info("   📌 RAG-keyword fallback: overriding to rag_query (explicit KB question)")
+
+        if crm_only and result["intent"] == "rag_query":
+            result["intent"] = "general"
+            logger.info("   📌 CRM mode: blocked rag_query intent")
         
         logger.info(f"🤖 LLM Intent Analysis:")
         logger.info(f"   Intent: {intent}")

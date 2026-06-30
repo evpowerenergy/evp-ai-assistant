@@ -12,6 +12,7 @@
    - `supabase/migrations/20250702000001_hybrid_search_kb.sql`
    - `supabase/migrations/20250703000001_hnsw_index.sql` (after ~100+ chunks indexed)
    - `supabase/migrations/20250704000001_seed_rag_eval_cases.sql`
+   - `supabase/migrations/20250705000001_chat_mode_preference.sql` (shared CRM/KB mode for web + LINE)
 
 2. Backend env: `SUPABASE_SERVICE_ROLE_KEY` must be the **service role** key (not anon).
 
@@ -70,6 +71,20 @@ Run `RUN_FIX_KB_DOCUMENTS_RLS.sql`. Use backend API for document list (not direc
 2. Verify RAG eval cases (intent routing)
 3. Manual test: upload SOP → ask related question → citation appears
 4. Manual test: ask `QT2026030013` → must use CRM tools, not RAG
+
+## Chat mode (CRM vs เอกสารบริษัท)
+
+- **Web:** segmented toggle above the message input (CRM vs เอกสารบริษัท)
+- **LINE:** Quick Reply buttons on bot replies, or text commands `MODE CRM` / `MODE KB`
+- Preference is stored in `user_chat_preferences.chat_mode` (shared across web and LINE)
+- **CRM mode:** CRM router/tools only — no RAG
+- **KB mode:** RAG only — CRM-style questions get a hint to switch modes
+
+Smoke tests:
+1. Web CRM + `ลีดวันนี้` → CRM tools
+2. Web KB + company reference question → citation from documents
+3. Web KB + `ลีดวันนี้` → switch-mode hint (no CRM data)
+4. Switch mode on web → same mode on LINE for the same user
 
 ## Config reference (`backend/.env`)
 

@@ -5,7 +5,9 @@ import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { SessionSidebar } from './SessionSidebar'
 import { ProcessStatusPanel } from './ProcessStatusPanel'
+import { ChatModeToggle } from './ChatModeToggle'
 import { useChat } from '@/hooks/useChat'
+import { useChatMode } from '@/hooks/useChatMode'
 import { useSession } from '@/hooks/useSession'
 import { useConfig } from '@/hooks/useConfig'
 
@@ -22,6 +24,7 @@ function getHeaderSessionTitle(session?: { title?: string; preview?: string } | 
 export function ChatInterface() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { messages, sendMessage, loadMessages, clearMessages, loading, error, processSteps, runtime, toolResults, debugPrecompute } = useChat()
+  const { mode: chatMode, setMode: setChatMode, modeLabel } = useChatMode()
   const { currentSession, sessions, createSession, switchSession, deleteSession, renameSession, updateSessionPreview } = useSession()
   const { config: modelConfig } = useConfig()
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -55,13 +58,13 @@ export function ChatInterface() {
         const newSession = await createSession(content)
         updateSessionPreview(newSession.id, content)
         try {
-          await sendMessage(content, newSession.id)
+          await sendMessage(content, newSession.id, chatMode)
         } finally {
           sendingFirstMessageRef.current = false
         }
       } else {
         updateSessionPreview(currentSession.id, content)
-        await sendMessage(content, currentSession.id)
+        await sendMessage(content, currentSession.id, chatMode)
       }
     } catch (err) {
       console.error('Failed to send message:', err)
@@ -99,6 +102,9 @@ export function ChatInterface() {
             <h1 className="truncate text-[15px] font-medium text-neutral-800 dark:text-neutral-100">
               {getHeaderSessionTitle(currentSession)}
             </h1>
+            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+              {modeLabel}
+            </span>
           </div>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -135,7 +141,18 @@ export function ChatInterface() {
         </div>
 
         {/* Input */}
-        <MessageInput onSend={handleSendMessage} disabled={loading} />
+        <MessageInput
+          onSend={handleSendMessage}
+          disabled={loading}
+          placeholder={
+            chatMode === 'kb'
+              ? 'ถามเกี่ยวกับ SOP, นโยบาย, ข้อมูลอ้างอิงบริษัท…'
+              : 'ถามเกี่ยวกับลีด, ยอดขาย, นัด, Marketing…'
+          }
+          modeToggle={
+            <ChatModeToggle mode={chatMode} onChange={setChatMode} disabled={loading} />
+          }
+        />
       </div>
 
       {/* Process Status Panel - Right Column */}
@@ -147,6 +164,7 @@ export function ChatInterface() {
         debugPrecompute={debugPrecompute}
         loadingHistory={isLoadingHistory}
         modelConfig={modelConfig}
+        chatMode={chatMode}
       />
     </div>
   )

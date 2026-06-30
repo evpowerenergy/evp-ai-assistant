@@ -4,13 +4,14 @@ Chat API Endpoint
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 import time
 import json
 from app.core.auth import require_ai_assistant_access
 from app.orchestrator.graph import process_message_stream
 from app.orchestrator.state import AIAssistantState
 from app.services.active_session import get_active_session, set_active_session
+from app.services.chat_mode import get_chat_mode, set_chat_mode
 from app.services.chat_processor import run_chat_turn
 from app.services.chat_history import load_chat_history, format_history_for_llm, save_message
 from app.utils.logger import get_logger
@@ -24,12 +25,14 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
     context: Optional[dict] = None
+    chat_mode: Optional[Literal["crm", "kb"]] = None
 
 
 class ChatResponse(BaseModel):
     """Chat response model"""
     response: str
     session_id: str
+    chat_mode: str = "crm"
     citations: Optional[List[str]] = None
     tool_calls: Optional[List[dict]] = None
     tool_results: Optional[List[dict]] = None  # NEW: Tool results with input/output
@@ -42,6 +45,32 @@ class ChatResponse(BaseModel):
 class ActiveSessionRequest(BaseModel):
     """Set active session for shared web/LINE history"""
     session_id: str
+
+
+class ChatModeRequest(BaseModel):
+    """Update shared chat mode preference"""
+    chat_mode: Literal["crm", "kb"]
+
+
+@router.get("/chat/mode")
+async def get_chat_mode_endpoint(
+    current_user: dict = Depends(require_ai_assistant_access),
+):
+    """Get the user's shared chat mode (web + LINE)."""
+    user_id = current_user.get("id")
+    mode = await get_chat_mode(user_id)
+    return {"chat_mode": mode}
+
+
+@router.patch("/chat/mode")
+async def patch_chat_mode_endpoint(
+    body: ChatModeRequest,
+    current_user: dict = Depends(require_ai_assistant_access),
+):
+    """Set shared chat mode preference."""
+    user_id = current_user.get("id")
+    mode = await set_chat_mode(user_id, body.chat_mode)
+    return {"chat_mode": mode}
 
 
 @router.get("/chat/active-session")
@@ -92,6 +121,7 @@ async def chat(
             message=request.message,
             session_id=session_id,
             source="web",
+            chat_mode=request.chat_mode,
         )
         runtime = turn.get("runtime") or (time.time() - start_time)
         
@@ -100,6 +130,7 @@ async def chat(
         response = ChatResponse(
             response=turn.get("response", "ขออภัยครับ ไม่สามารถสร้างคำตอบได้"),
             session_id=session_id,
+            chat_mode=turn.get("chat_mode", "crm"),
             citations=turn.get("citations"),
             tool_calls=turn.get("tool_calls"),
             tool_results=turn.get("tool_results", []),
@@ -148,11 +179,17 @@ async def chat_stream(
             
             # Create initial state
             user_role = current_user.get("role", "staff")
+            resolved_mode = (
+                request.chat_mode
+                if request.chat_mode
+                else await get_chat_mode(user_id)
+            )
             initial_state: AIAssistantState = {
                 "user_message": request.message,
                 "user_id": user_id,
                 "user_role": user_role,
                 "session_id": session_id,
+                "chat_mode": resolved_mode,
                 "chat_history": chat_history,  # NEW: Chat history for context
                 "history_context": history_context,  # NEW: Formatted history context
                 "intent": None,
@@ -174,6 +211,8 @@ async def chat_stream(
             
             # Node name mapping for display
             node_display_names = {
+                "mode_gate": "เลือกโหมดแชท",
+                "kb_guard": "ตรวจสอบโหมดเอกสาร",
                 "router": "วิเคราะห์ Intent",
                 "db_query": "ดึงข้อมูลจาก Database",
                 "rag_query": "ค้นหาเอกสาร",
@@ -201,7 +240,19 @@ async def chat_stream(
                 }
                 
                 # Extract preview based on node
-                if node_name == "router":
+                if node_name == "mode_gate":
+                    mode = node_state.get("chat_mode", "crm")
+                    step_info["preview"] = f"โหมด: {'CRM' if mode == 'crm' else 'เอกสารบริษัท'}"
+                    step_info["status"] = "completed"
+
+                elif node_name == "kb_guard":
+                    if node_state.get("intent") == "kb_blocked":
+                        step_info["preview"] = "คำถาม CRM — ให้สลับโหมด"
+                    else:
+                        step_info["preview"] = "เข้าสู่การค้นหาเอกสาร"
+                    step_info["status"] = "completed"
+
+                elif node_name == "router":
                     intent = node_state.get("intent", "unknown")
                     step_info["preview"] = f"Intent: {intent}"
                     step_info["status"] = "completed"
@@ -273,6 +324,7 @@ async def chat_stream(
                     "type": "final",
                     "response": final_state.get("response", ""),
                     "session_id": session_id,
+                    "chat_mode": final_state.get("chat_mode", resolved_mode),
                     "citations": final_state.get("citations"),
                     "tool_calls": final_state.get("tool_calls"),
                     "tool_results": final_state.get("tool_results", []),  # NEW: Include tool_results
@@ -288,7 +340,7 @@ async def chat_stream(
                     session_id=session_id,
                     role="user",
                     content=request.message,
-                    metadata={"source": "web"},
+                    metadata={"source": "web", "chat_mode": resolved_mode},
                 )
                 await save_message(
                     session_id=session_id,
@@ -296,6 +348,7 @@ async def chat_stream(
                     content=final_state.get("response", ""),
                     metadata={
                         "source": "web",
+                        "chat_mode": final_state.get("chat_mode", resolved_mode),
                         "intent": final_state.get("intent"),
                         "citations": final_state.get("citations", []),
                         "tool_calls": final_state.get("tool_calls", []),

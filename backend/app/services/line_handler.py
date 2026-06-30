@@ -10,8 +10,22 @@ from app.core.audit import log_audit
 from app.core.rate_limit import check_rate_limit
 from app.orchestrator.formatters.line_response import format_for_line
 from app.services.active_session import get_active_session
+from app.services.chat_mode import (
+    get_chat_mode,
+    line_quick_reply_items,
+    mode_display_label,
+    parse_mode_command,
+    prefix_response_with_mode,
+    set_chat_mode,
+)
 from app.services.chat_processor import run_chat_turn
-from app.services.line import push_message, reply_message, start_ai_search_feedback
+from app.services.line import (
+    push_message,
+    push_message_with_quick_reply,
+    reply_message,
+    reply_message_with_quick_reply,
+    start_ai_search_feedback,
+)
 from app.services.line_identity import resolve_line_user, unlink_by_line_user_id
 from app.services.line_link import consume_link_code, parse_link_command
 from app.utils.logger import get_logger
@@ -38,9 +52,11 @@ LINK_INSTRUCTIONS = """ยังไม่ได้เชื่อมต่อบ
 HELP_MESSAGE = """คำสั่งที่ใช้ได้:
 • LINK 123456 — เชื่อมต่อบัญชี (รหัสจากเว็บ)
 • UNLINK — ยกเลิกการเชื่อมต่อ
+• MODE CRM — โหมด CRM (ลีด, ยอดขาย, นัด)
+• MODE KB — โหมดเอกสารบริษัท (SOP, ข้อมูลอ้างอิง)
 • HELP — แสดงความช่วยเหลือ
 
-ถามคำถามเกี่ยวกับ CRM หรือเอกสารได้โดยตรงหลังเชื่อมต่อแล้ว"""
+ถามคำถามได้โดยตรงหลังเชื่อมต่อแล้ว — เลือกโหมดด้วยปุ่ม Quick Reply หรือคำสั่ง MODE"""
 
 
 def _line_user_id_from_event(event: Dict[str, Any]) -> Optional[str]:
@@ -105,7 +121,7 @@ async def handle_line_text_message(
     upper = text.upper()
 
     if upper == "HELP":
-        await _reply_or_push(reply_token, line_user_id, HELP_MESSAGE)
+        await _reply_or_push_with_mode(reply_token, line_user_id, HELP_MESSAGE)
         return
 
     if upper == "UNLINK":
@@ -134,7 +150,15 @@ async def handle_line_text_message(
             response_data={"message": result.get("message")},
             metadata={"line_user_id": line_user_id},
         )
-        await _reply_or_push(reply_token, line_user_id, result.get("message", "เกิดข้อผิดพลาด"))
+        msg = result.get("message", "เกิดข้อผิดพลาด")
+        if result.get("success") and result.get("user_id"):
+            mode = await get_chat_mode(result["user_id"])
+            msg = prefix_response_with_mode(msg, mode)
+            await _reply_or_push_with_mode(
+                reply_token, line_user_id, msg, user_id=result["user_id"]
+            )
+        else:
+            await _reply_or_push(reply_token, line_user_id, msg)
         return
 
     user = await resolve_line_user(line_user_id)
@@ -166,18 +190,39 @@ async def handle_line_text_message(
     user_id = user["id"]
     user_role = user["role"]
 
+    mode_cmd = parse_mode_command(text)
+    if mode_cmd:
+        new_mode = await set_chat_mode(user_id, mode_cmd)
+        label = mode_display_label(new_mode)
+        confirm = prefix_response_with_mode(
+            f"สลับเป็นโหมด {label} แล้ว",
+            new_mode,
+        )
+        await _reply_or_push_with_mode(
+            reply_token, line_user_id, confirm, user_id=user_id
+        )
+        await log_audit(
+            user_id=user_id,
+            action="line_mode_change",
+            resource="line",
+            metadata={"line_user_id": line_user_id, "chat_mode": new_mode},
+        )
+        return
+
     is_allowed, _ = await check_rate_limit(user_id=user_id, endpoint="chat")
     if not is_allowed:
-        await _reply_or_push(
+        await _reply_or_push_with_mode(
             reply_token,
             line_user_id,
             "คุณส่งข้อความบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่",
+            user_id=user_id,
         )
         return
 
     await start_ai_search_feedback(line_user_id, reply_token=reply_token)
 
     try:
+        chat_mode = await get_chat_mode(user_id)
         session_id = await get_active_session(user_id, first_message=text)
         result = await run_chat_turn(
             user_id=user_id,
@@ -186,24 +231,37 @@ async def handle_line_text_message(
             session_id=session_id,
             source="line",
             line_user_id=line_user_id,
+            chat_mode=chat_mode,
         )
         formatted = format_for_line(
             result.get("response", ""),
             result.get("citations"),
         )
-        await push_message(line_user_id, formatted)
+        outgoing = prefix_response_with_mode(
+            formatted, result.get("chat_mode", chat_mode)
+        )
+        await push_message_with_quick_reply(
+            line_user_id,
+            outgoing,
+            line_quick_reply_items(),
+        )
         await log_audit(
             user_id=user_id,
             action="line_message",
             resource="line",
             request_data={"message": text[:200]},
-            metadata={"line_user_id": line_user_id, "session_id": session_id},
+            metadata={
+                "line_user_id": line_user_id,
+                "session_id": session_id,
+                "chat_mode": result.get("chat_mode", chat_mode),
+            },
         )
     except Exception as e:
         logger.error("LINE AI error: %s", e)
-        await push_message(
+        await push_message_with_quick_reply(
             line_user_id,
             "ขออภัยครับ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+            line_quick_reply_items(),
         )
 
 
@@ -217,3 +275,17 @@ async def _reply_or_push(
         if ok:
             return
     await push_message(line_user_id, text)
+
+
+async def _reply_or_push_with_mode(
+    reply_token: Optional[str],
+    line_user_id: str,
+    text: str,
+    user_id: Optional[str] = None,
+) -> None:
+    quick_items = line_quick_reply_items()
+    if reply_token:
+        ok = await reply_message_with_quick_reply(reply_token, text, quick_items)
+        if ok:
+            return
+    await push_message_with_quick_reply(line_user_id, text, quick_items)

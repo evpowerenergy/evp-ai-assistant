@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, FormEvent, KeyboardEvent } from 'react'
+import { useState, FormEvent, KeyboardEvent, ReactNode } from 'react'
 
 interface MessageInputProps {
   onSend: (message: string) => void
   disabled?: boolean
+  placeholder?: string
+  modeToggle?: ReactNode
 }
 
-export function MessageInput({ onSend, disabled }: MessageInputProps) {
+export function MessageInput({ onSend, disabled, placeholder, modeToggle }: MessageInputProps) {
   const [message, setMessage] = useState('')
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -30,6 +32,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
 
   return (
     <div className="border-t border-neutral-200/90 bg-[#fafafa] px-3 py-3 dark:border-neutral-800 dark:bg-[#212121] sm:px-4 sm:pb-4">
+      {modeToggle}
       <form onSubmit={handleSubmit} className="mx-auto flex max-w-3xl items-end gap-2">
         <div className="relative flex min-h-[52px] flex-1 items-end rounded-[26px] border border-neutral-300 bg-white shadow-sm ring-emerald-500/0 transition-shadow focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-500/15 dark:border-neutral-600 dark:bg-[#2f2f2f] dark:focus-within:border-emerald-700/80 dark:focus-within:ring-emerald-400/10">
           <textarea
@@ -37,7 +40,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={disabled}
-            placeholder="พิมพ์คำถามถึง EV Power AI…"
+            placeholder={placeholder || 'พิมพ์คำถามถึง EV Power AI…'}
             className="max-h-[200px] min-h-[48px] w-full resize-none rounded-[26px] border-0 bg-transparent px-4 py-3 pr-2 text-[15px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 dark:text-neutral-100 dark:placeholder:text-neutral-500"
             rows={1}
             style={{
