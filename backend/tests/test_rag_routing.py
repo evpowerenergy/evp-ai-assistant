@@ -69,3 +69,12 @@ def test_rag_heuristic_irrelevant_when_mode_is_crm():
     msg = "ข้อมูลพื้นฐานของบริษัทมีอะไรบ้าง"
     assert _message_has_rag_keyword(msg)
     # Routing is enforced by chat_mode in graph + analyze_intent_with_llm, not keyword alone.
+
+
+def test_expand_kb_company_query():
+    from app.services.query_rewrite import expand_kb_company_query
+
+    expanded = expand_kb_company_query("บริษัทเราทำอะไรบ้าง")
+    assert expanded is not None
+    assert "EV POWER" in expanded
+    assert expand_kb_company_query("ลีดวันนี้มีกี่ราย") is None

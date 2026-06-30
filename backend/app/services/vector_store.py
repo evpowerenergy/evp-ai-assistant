@@ -217,11 +217,11 @@ async def search_similar(
             except Exception as e2:
                 logger.error("Fallback vector search error: %s", e2)
 
-    if not candidates and threshold > 0.5:
+    if not candidates and threshold > 0.30:
         return await search_similar(
             query,
             limit=limit,
-            threshold=max(threshold - 0.1, 0.45),
+            threshold=max(threshold - 0.08, 0.30),
             category_filter=category_filter,
             rewrite_query=False,
         )

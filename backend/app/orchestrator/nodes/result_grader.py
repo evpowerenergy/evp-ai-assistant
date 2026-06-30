@@ -280,14 +280,15 @@ async def result_grader_node(state: AIAssistantState) -> AIAssistantState:
 
             max_sim = max((r.get("similarity") or 0) for r in rag_results)
             max_rerank = max((r.get("rerank_score") or 0) for r in rag_results)
-            if max_sim < 0.5 and max_rerank < 4:
+            # Hybrid RRF fused scores are ~0.01–0.03; rely on rerank or any hit.
+            if max_rerank >= 4 or max_sim >= 0.35 or len(rag_results) >= 1:
+                state["data_quality"] = "sufficient"
+                state["quality_reason"] = f"Found {len(rag_results)} relevant document chunks"
+            else:
                 state["data_quality"] = "insufficient"
                 state["quality_reason"] = (
                     f"Low retrieval confidence (similarity={max_sim:.2f}, rerank={max_rerank})"
                 )
-            else:
-                state["data_quality"] = "sufficient"
-                state["quality_reason"] = f"Found {len(rag_results)} relevant document chunks"
             state["suggested_retry_params"] = {}
             logger.info("   RAG quality: %s", state["data_quality"])
             return state

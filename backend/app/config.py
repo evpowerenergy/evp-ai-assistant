@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     KB_CHUNK_OVERLAP: int = 200
     KB_RETRIEVE_CANDIDATES: int = 20
     KB_RERANK_TOP_K: int = 5
-    KB_SIMILARITY_THRESHOLD: float = 0.65
+    KB_SIMILARITY_THRESHOLD: float = 0.38
     KB_ENABLE_HYBRID_SEARCH: bool = True
     KB_ENABLE_RERANK: bool = True
     KB_ENABLE_OCR: bool = True
