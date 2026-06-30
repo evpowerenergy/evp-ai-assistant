@@ -8,6 +8,7 @@ import { hasAiAssistantAccess } from '@/lib/aiAssistantAccess'
 import { useConfig } from '@/hooks/useConfig'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { BrandLogo } from '@/components/ui/BrandLogo'
+import { LineLinkControl } from '@/components/line/LineLinkControl'
 
 export default function ChatPage() {
   const { userRole } = useAuth()
@@ -29,6 +30,7 @@ export default function ChatPage() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <ThemeToggle />
+          <LineLinkControl variant="header" />
           <span
             className="hidden max-w-[220px] truncate rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1 font-mono text-[11px] text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900/90 dark:text-neutral-400 lg:inline-flex"
             title="Model ที่ใช้สร้างคำตอบ"

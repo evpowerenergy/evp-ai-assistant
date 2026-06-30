@@ -26,6 +26,16 @@ async def generate_response_node(state: AIAssistantState) -> AIAssistantState:
         rag_results = state.get("rag_results", [])
         citations = state.get("citations", [])
         history_context = state.get("history_context", "")
+        data_quality = state.get("data_quality")
+        intent = state.get("intent", "")
+
+        # Grounded empty RAG — do not call LLM
+        if intent == "rag_query" and not tool_results and data_quality == "empty":
+            state["response"] = (
+                "ไม่พบเอกสารในระบบที่เกี่ยวข้องกับคำถามนี้ครับ "
+                "ลองถามใหม่ด้วยคำที่เฉพาะเจาะจงขึ้น หรือติดต่อผู้ดูแลเพื่ออัปโหลดเอกสารที่เกี่ยวข้อง"
+            )
+            return state
 
         logger.info(f"{'='*60}")
         logger.info(f"💬 [STEP 4/4] Generate Response Node: Creating LLM response")

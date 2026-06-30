@@ -39,6 +39,12 @@ cryptography==42.0.5
 # Utilities
 python-dotenv==1.0.0
 
+# Document extraction (RAG ingest)
+pymupdf==1.24.14
+python-docx==1.1.2
+pytesseract==0.3.13
+Pillow==11.1.0
+
 # Dependency Constraints
 # Fix conflict: langchain-core requires packaging<24.0, but supabase may install 25.0
 packaging>=23.2,<24.0

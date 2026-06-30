@@ -8,8 +8,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 from app.utils.exceptions import AuthenticationError, PermissionDeniedError
 from app.utils.logger import get_logger
-from app.services.supabase import get_supabase_client
 from app.config import settings
+from app.core.roles import is_ai_assistant_role, resolve_role_from_db
 
 logger = get_logger(__name__)
 security = HTTPBearer()
@@ -65,25 +65,6 @@ async def verify_jwt_token(token: str) -> dict:
         raise AuthenticationError("Token verification failed")
 
 
-def _resolve_role_from_db(auth_user_id: str) -> Optional[str]:
-    """
-    Resolve role from users or employees table (service role, no RLS).
-    So API auth matches frontend /me and CRM pattern.
-    """
-    try:
-        supabase = get_supabase_client()
-        for table in ("users", "employees"):
-            r = supabase.table(table).select("role").eq("auth_user_id", auth_user_id).limit(1).execute()
-            row = (r.data or [])[0] if r.data else None
-            if row and row.get("role"):
-                role = str(row.get("role", "")).strip()
-                if role:
-                    return role
-    except Exception as e:
-        logger.debug("resolve role from db: %s", e)
-    return None
-
-
 async def get_user_from_token(token_payload: dict) -> dict:
     """
     Get user information: role from DB (users/employees) first, then JWT metadata.
@@ -97,7 +78,7 @@ async def get_user_from_token(token_payload: dict) -> dict:
         role_from_metadata = user_metadata.get("role") or "staff"
         
         # Resolve role from DB so API auth matches frontend (super_admin etc.)
-        role_from_db = _resolve_role_from_db(user_id)
+        role_from_db = resolve_role_from_db(user_id)
         role = (role_from_db or role_from_metadata) if role_from_db else role_from_metadata
         
         return {
@@ -113,7 +94,7 @@ async def get_user_from_token(token_payload: dict) -> dict:
         return {
             "id": user_id,
             "email": token_payload.get("email", ""),
-            "role": _resolve_role_from_db(user_id) or (token_payload.get("user_metadata") or {}).get("role", "staff")
+            "role": resolve_role_from_db(user_id) or (token_payload.get("user_metadata") or {}).get("role", "staff")
         }
 
 
@@ -150,9 +131,8 @@ async def require_ai_assistant_access(
     """
     Only users whose role is in AI_ASSISTANT_ALLOWED_ROLES may use authenticated AI APIs.
     """
-    allowed = {r.lower() for r in settings.ai_assistant_allowed_roles_list}
-    user_role = (current_user.get("role") or "").strip().lower()
-    if user_role not in allowed:
+    user_role = current_user.get("role")
+    if not is_ai_assistant_role(user_role):
         allowed_str = ", ".join(settings.ai_assistant_allowed_roles_list)
         logger.warning(
             "AI Assistant access denied for user %s with role %s",

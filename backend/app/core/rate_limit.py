@@ -61,6 +61,7 @@ class RateLimiter:
 user_rate_limiter = RateLimiter(max_requests=100, window_seconds=60)  # 100 req/min per user
 ip_rate_limiter = RateLimiter(max_requests=200, window_seconds=60)  # 200 req/min per IP
 chat_rate_limiter = RateLimiter(max_requests=20, window_seconds=60)  # 20 chat req/min per user
+line_webhook_rate_limiter = RateLimiter(max_requests=300, window_seconds=60)  # per IP
 
 
 async def check_rate_limit(
@@ -88,7 +89,10 @@ async def check_rate_limit(
     
     # Check IP rate limit
     if ip_address:
-        allowed, _ = ip_rate_limiter.is_allowed(f"ip:{ip_address}")
+        if endpoint == "line_webhook":
+            allowed, _ = line_webhook_rate_limiter.is_allowed(f"ip:{ip_address}:line_webhook")
+        else:
+            allowed, _ = ip_rate_limiter.is_allowed(f"ip:{ip_address}")
         if not allowed:
             logger.warning(f"Rate limit exceeded for IP: {ip_address}")
             return False, remaining

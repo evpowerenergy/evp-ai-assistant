@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.utils.logger import setup_logging, get_logger
-from app.api.v1 import chat, line, ingest, health, test_tools, config as config_router, prompt_tests, me as me_router
+from app.api.v1 import chat, line, line_link, ingest, documents, health, test_tools, config as config_router, prompt_tests, me as me_router
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
 
 # Setup logging
@@ -51,7 +51,9 @@ app.add_middleware(RateLimitMiddleware)
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(line.router, prefix="/api/v1", tags=["line"])
+app.include_router(line_link.router, prefix="/api/v1", tags=["line"])
 app.include_router(ingest.router, prefix="/api/v1", tags=["ingest"])
+app.include_router(documents.router, prefix="/api/v1", tags=["documents"])
 app.include_router(test_tools.router, prefix="/api/v1", tags=["test-tools"])
 app.include_router(config_router.router, prefix="/api/v1", tags=["config"])
 app.include_router(prompt_tests.router, prefix="/api/v1", tags=["prompt-tests"])

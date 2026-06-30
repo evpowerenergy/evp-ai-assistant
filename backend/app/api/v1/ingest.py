@@ -1,107 +1,106 @@
 """
-Document Ingestion API Endpoint (Admin only)
+Document Ingestion API (super_admin only, async job).
 """
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from typing import Optional
-from app.core.auth import require_ai_assistant_access
-from app.core.audit import log_audit
-from app.services.vector_store import ingest_document
+
+from app.core.auth import require_ai_assistant_access, require_role
+from app.services.document_extractor import DocumentExtractionError
+from app.services.ingest_service import (
+    create_ingest_job,
+    find_duplicate_by_hash,
+    run_ingest_pipeline,
+    content_hash,
+)
+from app.services.document_extractor import extract_document
+from app.config import settings
 from app.utils.logger import get_logger
-import io
 
 logger = get_logger(__name__)
 router = APIRouter()
 
+require_super_admin = require_role(["super_admin"])
 
-@router.post("/ingest")
+
+@router.post("/ingest", status_code=status.HTTP_202_ACCEPTED)
 async def ingest_document_endpoint(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
-    current_user: dict = Depends(require_ai_assistant_access)
+    category: Optional[str] = Form(None),
+    allow_duplicate: bool = Form(False),
+    current_user: dict = Depends(require_super_admin),
 ):
     """
-    Ingest document into knowledge base
-    (Same role gate as other AI Assistant APIs.)
-    
-    Supports: .txt, .md, .pdf (text extraction)
+    Queue document ingestion into knowledge base.
+    Supports: .txt, .md, .pdf, .docx
     """
-    try:
-        user_id = current_user.get("id")
-        logger.info(f"Document ingestion request from user {user_id}: {file.filename}")
-        
-        # Read file content
-        content_bytes = await file.read()
-        
-        # Extract text based on file type
-        content = extract_text_from_file(content_bytes, file.content_type or file.filename)
-        
-        if not content:
-            raise HTTPException(status_code=400, detail="Could not extract text from file")
-        
-        # Use filename as title if not provided
-        document_title = title or file.filename or "Untitled Document"
-        
-        # Ingest document
-        document_id = await ingest_document(
-            title=document_title,
-            content=content,
-            file_path=file.filename,
-            file_type=file.content_type,
-            uploaded_by=user_id
-        )
-        
-        # Log ingestion
-        await log_audit(
-            user_id=user_id,
-            action="document_ingest",
-            resource="kb_documents",
-            request_data={
-                "filename": file.filename,
-                "content_type": file.content_type,
-                "document_id": document_id
-            }
-        )
-        
-        return {
-            "status": "success",
-            "message": "Document ingested successfully",
-            "document_id": document_id,
-            "filename": file.filename
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Document ingestion error: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    user_id = current_user.get("id")
+    filename = file.filename or "upload"
+    document_title = (title or "").strip() or filename
 
+    content_bytes = await file.read()
+    if len(content_bytes) > settings.KB_MAX_FILE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large (max {settings.KB_MAX_FILE_BYTES // (1024 * 1024)} MB)",
+        )
+    if not content_bytes:
+        raise HTTPException(status_code=400, detail="Empty file")
 
-def extract_text_from_file(content_bytes: bytes, content_type: str) -> str:
-    """
-    Extract text from file based on content type
-    """
+    # Quick validation extract (full pipeline runs in background)
     try:
-        # Text files
-        if content_type in ["text/plain", "text/markdown"] or content_type.endswith(".txt") or content_type.endswith(".md"):
-            return content_bytes.decode("utf-8")
-        
-        # Markdown
-        if content_type == "text/markdown" or content_type.endswith(".md"):
-            return content_bytes.decode("utf-8")
-        
-        # Default: try UTF-8
-        try:
-            return content_bytes.decode("utf-8")
-        except UnicodeDecodeError:
-            # Try other encodings
-            for encoding in ["latin-1", "cp1252"]:
-                try:
-                    return content_bytes.decode(encoding)
-                except UnicodeDecodeError:
-                    continue
-        
-        raise Exception("Could not decode file content")
-    
-    except Exception as e:
-        logger.error(f"Text extraction error: {e}")
-        raise
+        extracted = extract_document(content_bytes, filename, file.content_type)
+    except DocumentExtractionError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    text_hash = content_hash(extracted.text)
+    if not allow_duplicate:
+        dup = await find_duplicate_by_hash(text_hash)
+        if dup:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "Duplicate document content",
+                    "existing_document_id": dup.get("id"),
+                    "existing_title": dup.get("title"),
+                },
+            )
+
+    job_info = await create_ingest_job(
+        title=document_title,
+        filename=filename,
+        file_type=file.content_type,
+        file_size=len(content_bytes),
+        uploaded_by=user_id,
+        category=category,
+    )
+
+    background_tasks.add_task(
+        run_ingest_pipeline,
+        document_id=job_info["document_id"],
+        job_id=job_info["job_id"],
+        content_bytes=content_bytes,
+        filename=filename,
+        title=document_title,
+        file_type=file.content_type,
+        uploaded_by=user_id,
+        category=category,
+        allow_duplicate=allow_duplicate,
+    )
+
+    logger.info(
+        "Queued ingest document_id=%s job_id=%s user=%s file=%s",
+        job_info["document_id"],
+        job_info["job_id"],
+        user_id,
+        filename,
+    )
+
+    return {
+        "status": "accepted",
+        "message": "Document ingestion queued",
+        "document_id": job_info["document_id"],
+        "job_id": job_info["job_id"],
+        "filename": filename,
+    }

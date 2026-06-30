@@ -5,14 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-from uuid import uuid4
 import time
 import json
 from app.core.auth import require_ai_assistant_access
-from app.core.audit import log_chat_request, log_tool_call
-from app.orchestrator.graph import process_message, process_message_stream
+from app.orchestrator.graph import process_message_stream
 from app.orchestrator.state import AIAssistantState
-from app.services.supabase import get_supabase_client
+from app.services.active_session import get_active_session, set_active_session
+from app.services.chat_processor import run_chat_turn
 from app.services.chat_history import load_chat_history, format_history_for_llm, save_message
 from app.utils.logger import get_logger
 
@@ -40,6 +39,32 @@ class ChatResponse(BaseModel):
     debug_precompute: Optional[Dict[str, Any]] = None  # NEW: Pre-computed summaries for UI debug
 
 
+class ActiveSessionRequest(BaseModel):
+    """Set active session for shared web/LINE history"""
+    session_id: str
+
+
+@router.get("/chat/active-session")
+async def get_active_chat_session(
+    current_user: dict = Depends(require_ai_assistant_access),
+):
+    """Get the user's active chat session id (shared with LINE)."""
+    user_id = current_user.get("id")
+    session_id = await get_active_session(user_id, first_message=None)
+    return {"success": True, "session_id": session_id}
+
+
+@router.patch("/chat/active-session")
+async def patch_active_chat_session(
+    body: ActiveSessionRequest,
+    current_user: dict = Depends(require_ai_assistant_access),
+):
+    """Set active chat session (web sidebar switch syncs with LINE)."""
+    user_id = current_user.get("id")
+    await set_active_session(user_id, body.session_id)
+    return {"success": True, "session_id": body.session_id}
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
@@ -53,105 +78,35 @@ async def chat(
         user_id = current_user.get("id")
         logger.info(f"Chat request from user {user_id}: {request.message[:50]}...")
         
-        # Get or create session
+        user_role = current_user.get("role", "staff")
         session_id = request.session_id
         if not session_id:
-            session_id = await create_or_get_session(user_id, request.message)
+            session_id = await get_active_session(user_id, first_message=request.message)
+        else:
+            await set_active_session(user_id, session_id)
         
-        # Load chat history for context (exclude_current=False so we include all previous turns)
-        chat_history = await load_chat_history(session_id, limit=20, exclude_current=False)
-        history_context = format_history_for_llm(chat_history, max_tokens=2000) if chat_history else ""
-        
-        logger.info(f"Loaded {len(chat_history)} messages from history for session {session_id}")
-        
-        # Start timing
         start_time = time.time()
-        
-        # Create initial state
-        user_role = current_user.get("role", "staff")
-        initial_state: AIAssistantState = {
-            "user_message": request.message,
-            "user_id": user_id,
-            "user_role": user_role,  # Add user role to state
-            "session_id": session_id,
-            "chat_history": chat_history,  # NEW: Chat history for context
-            "history_context": history_context,  # NEW: Formatted history context
-            "intent": None,
-            "confidence": 0.0,
-            "tool_calls": [],
-            "tool_results": [],
-            "rag_results": [],
-            "citations": [],
-            # Retry management (NEW)
-            "retry_count": 0,
-            "max_retries": 0,  # Disabled: Retry mechanism causes incorrect parameters
-            "previous_attempts": [],
-            # Data quality (NEW)
-            "data_quality": None,
-            "quality_reason": None,
-            "suggested_retry_params": None,
-            "alternative_queries": [],
-            # Final response
-            "response": None,
-            "error": None
-        }
-        
-        # Process message through workflow
-        result_state = await process_message(initial_state)
-        
-        # Calculate runtime
-        runtime = time.time() - start_time
-        
-        # Save messages to database (using new chat_history service)
-        await save_message(
-            session_id=session_id,
-            role="user",
-            content=request.message,
-            metadata={}
-        )
-        await save_message(
-            session_id=session_id,
-            role="assistant",
-            content=result_state.get("response", ""),
-            metadata={
-                "intent": result_state.get("intent"),
-                "citations": result_state.get("citations", []),
-                "tool_calls": result_state.get("tool_calls", [])
-            }
-        )
-        
-        # Log tool calls
-        for tool_call in result_state.get("tool_calls", []):
-            await log_tool_call(
-                user_id=user_id,
-                tool_name=tool_call.get("tool", "unknown"),
-                tool_input=tool_call.get("input", {}),
-                tool_output=tool_call.get("output", {})
-            )
-        
-        # Log request
-        await log_chat_request(
+        turn = await run_chat_turn(
             user_id=user_id,
-            session_id=session_id,
+            user_role=user_role,
             message=request.message,
-            response=result_state.get("response"),
-            tool_calls=result_state.get("tool_calls")
-        )
-        
-        # Build process steps from state
-        process_steps = build_process_steps(result_state, runtime)
-        
-        # Build response
-        response = ChatResponse(
-            response=result_state.get("response", "ขออภัยครับ ไม่สามารถสร้างคำตอบได้"),
             session_id=session_id,
-            citations=result_state.get("citations"),
-            tool_calls=result_state.get("tool_calls"),
-            tool_results=result_state.get("tool_results", []),  # NEW: Include tool_results
-            intent=result_state.get("intent"),
+            source="web",
+        )
+        runtime = turn.get("runtime") or (time.time() - start_time)
+        
+        process_steps = build_process_steps_from_turn(turn, runtime)
+        
+        response = ChatResponse(
+            response=turn.get("response", "ขออภัยครับ ไม่สามารถสร้างคำตอบได้"),
+            session_id=session_id,
+            citations=turn.get("citations"),
+            tool_calls=turn.get("tool_calls"),
+            tool_results=turn.get("tool_results", []),
+            intent=turn.get("intent"),
             process_steps=process_steps,
             runtime=runtime,
-            debug_precompute=result_state.get("debug_precompute"),
+            debug_precompute=turn.get("debug_precompute"),
         )
         
         return response
@@ -178,7 +133,9 @@ async def chat_stream(
             # Get or create session
             session_id = request.session_id
             if not session_id:
-                session_id = await create_or_get_session(user_id, request.message)
+                session_id = await get_active_session(user_id, first_message=request.message)
+            else:
+                await set_active_session(user_id, session_id)
             
             # Load chat history for context (exclude_current=False so we include all previous turns)
             chat_history = await load_chat_history(session_id, limit=20, exclude_current=False)
@@ -294,8 +251,14 @@ async def chat_stream(
                 
                 elif node_name == "rag_query":
                     rag_results = node_state.get("rag_results", [])
+                    rag_meta = node_state.get("rag_retrieval_meta") or {}
                     count = len(rag_results) if isinstance(rag_results, list) else 0
-                    step_info["preview"] = f"พบ {count} เอกสาร" if count > 0 else "ไม่พบเอกสาร"
+                    ms = rag_meta.get("retrieval_ms")
+                    step_info["preview"] = (
+                        f"พบ {count} เอกสาร ({ms}ms)" if count > 0 and ms else
+                        (f"พบ {count} เอกสาร" if count > 0 else "ไม่พบเอกสาร")
+                    )
+                    step_info["data"] = rag_meta
                     step_info["status"] = "completed"
                 
                 # Send SSE event
@@ -316,6 +279,7 @@ async def chat_stream(
                     "intent": final_state.get("intent"),
                     "runtime": runtime,
                     "debug_precompute": final_state.get("debug_precompute"),
+                    "rag_retrieval_meta": final_state.get("rag_retrieval_meta"),
                 }
                 yield f"data: {json.dumps(final_response)}\n\n"
                 
@@ -324,18 +288,22 @@ async def chat_stream(
                     session_id=session_id,
                     role="user",
                     content=request.message,
-                    metadata={}
+                    metadata={"source": "web"},
                 )
                 await save_message(
                     session_id=session_id,
                     role="assistant",
                     content=final_state.get("response", ""),
                     metadata={
+                        "source": "web",
                         "intent": final_state.get("intent"),
                         "citations": final_state.get("citations", []),
-                        "tool_calls": final_state.get("tool_calls", [])
-                    }
+                        "tool_calls": final_state.get("tool_calls", []),
+                        "rag": final_state.get("rag_retrieval_meta"),
+                    },
                 )
+                from app.services.active_session import touch_session
+                await touch_session(session_id)
         
         except Exception as e:
             logger.error(f"Streaming chat error: {e}")
@@ -357,59 +325,42 @@ async def chat_stream(
 
 
 async def create_or_get_session(user_id: str, first_message: str) -> str:
-    """Create or get existing session"""
-    try:
-        supabase = get_supabase_client()
-        
-        # Create new session
-        session_data = {
-            "id": str(uuid4()),
-            "user_id": user_id,
-            "title": first_message[:50] + ("..." if len(first_message) > 50 else "")
-        }
-        
-        result = supabase.table("chat_sessions").insert(session_data).execute()
-        
-        if result.data:
-            return result.data[0].get("id")
-        else:
-            raise Exception("Failed to create session")
-    
-    except Exception as e:
-        logger.error(f"Session creation error: {e}")
-        # Return a temporary session ID
-        return str(uuid4())
+    """Deprecated: use active_session.get_active_session."""
+    return await get_active_session(user_id, first_message=first_message)
+
+
+def build_process_steps_from_turn(turn: dict, total_runtime: float) -> List[Dict[str, Any]]:
+    """Build process steps from run_chat_turn result."""
+    state = {
+        "intent": turn.get("intent"),
+        "tool_results": turn.get("tool_results", []),
+        "retry_count": 0,
+        "data_quality": None,
+        "rag_results": [],
+    }
+    return build_process_steps(state, total_runtime)  # type: ignore[arg-type]
 
 
 async def save_messages(session_id: str, user_message: str, state: AIAssistantState):
     """Save user and assistant messages to database"""
     try:
-        supabase = get_supabase_client()
-        
-        # Save user message
-        user_msg = {
-            "id": str(uuid4()),
-            "session_id": session_id,
-            "role": "user",
-            "content": user_message,
-            "metadata": {}
-        }
-        supabase.table("chat_messages").insert(user_msg).execute()
-        
-        # Save assistant message
-        assistant_msg = {
-            "id": str(uuid4()),
-            "session_id": session_id,
-            "role": "assistant",
-            "content": state.get("response", ""),
-            "metadata": {
+        await save_message(
+            session_id=session_id,
+            role="user",
+            content=user_message,
+            metadata={"source": "web"},
+        )
+        await save_message(
+            session_id=session_id,
+            role="assistant",
+            content=state.get("response", ""),
+            metadata={
+                "source": "web",
                 "intent": state.get("intent"),
                 "citations": state.get("citations", []),
-                "tool_calls": state.get("tool_calls", [])
-            }
-        }
-        supabase.table("chat_messages").insert(assistant_msg).execute()
-    
+                "tool_calls": state.get("tool_calls", []),
+            },
+        )
     except Exception as e:
         logger.error(f"Error saving messages: {e}")
 
@@ -439,6 +390,7 @@ async def get_chat_history(
                 "content": msg.get("content"),
                 "citations": msg.get("metadata", {}).get("citations"),
                 "tool_calls": msg.get("metadata", {}).get("tool_calls"),
+                "source": msg.get("metadata", {}).get("source"),
                 "created_at": msg.get("created_at")
             })
         
@@ -531,11 +483,18 @@ def build_process_steps(state: AIAssistantState, total_runtime: float) -> List[D
                 })
     
     elif intent == "rag_query":
+        rag_meta = state.get("rag_retrieval_meta") or {}
+        ms = rag_meta.get("retrieval_ms")
+        count = len(state.get("rag_results", []))
+        preview = f"พบ {count} เอกสาร"
+        if ms:
+            preview += f" ({ms}ms)"
         steps.append({
             "name": "rag_query",
             "status": "completed",
             "duration": total_runtime * 0.3,
-            "preview": f"พบ {len(state.get('rag_results', []))} เอกสาร"
+            "preview": preview,
+            "data": rag_meta,
         })
     
     # Removed direct_answer - general queries go through generate_response

@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     # LINE
     LINE_CHANNEL_SECRET: str = ""
     LINE_CHANNEL_ACCESS_TOKEN: str = ""
+    # Loading animation via API (no LINE Console toggle). Shown only if user is on chat screen.
+    LINE_LOADING_SECONDS: int = 60
+    # Optional sticker while searching (LINE Developers → Stickers). Leave empty to skip.
+    LINE_STICKER_PACKAGE_ID: str = ""
+    LINE_STICKER_ID_LOADING: str = ""
     
     # App
     ENVIRONMENT: str = "development"
@@ -32,6 +37,23 @@ class Settings(BaseSettings):
 
     # Who may use authenticated AI Assistant APIs (comma-separated; case-insensitive match)
     AI_ASSISTANT_ALLOWED_ROLES: str = "super_admin,manager_sale,manager_marketing,manager_hr"
+
+    # Knowledge base / RAG
+    KB_STORAGE_BUCKET: str = "kb-documents"
+    KB_MAX_FILE_BYTES: int = 20_000_000
+    KB_MAX_CHUNKS: int = 500
+    KB_CHUNK_SIZE: int = 1000
+    KB_CHUNK_OVERLAP: int = 200
+    KB_RETRIEVE_CANDIDATES: int = 20
+    KB_RERANK_TOP_K: int = 5
+    KB_SIMILARITY_THRESHOLD: float = 0.65
+    KB_ENABLE_HYBRID_SEARCH: bool = True
+    KB_ENABLE_RERANK: bool = True
+    KB_ENABLE_OCR: bool = True
+    KB_ENABLE_QUERY_REWRITE: bool = True
+    KB_MIN_CHARS_PER_PAGE: int = 50
+    KB_INGEST_STALE_MINUTES: int = 30
+    KB_RAG_CONTEXT_MAX_CHARS: int = 8000
     
     # CORS - Accept string, will be parsed to list via property
     # Can be set as comma-separated string: "http://localhost:3000,http://localhost:3001"

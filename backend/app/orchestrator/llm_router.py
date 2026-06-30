@@ -645,17 +645,28 @@ Available tools (ALWAYS use function calling for data queries):
             intent = "db_query"
             confidence = 0.9
         
-        # Check response content and message for intent clues
+        # Check response content and message for intent clues (only when no DB tool calls)
         content = (message.content or "").lower()
         message_lower = user_message.lower()
-        
-        # Check for RAG query patterns
-        if "document" in content or "procedure" in content or "how to" in message_lower or "ขั้นตอน" in message_lower or "วิธีทำ" in message_lower:
+
+        sales_doc_markers = (
+            "qt", "ใบแจ้งหนี้", "invoice", "quotation", "เอกสารการขาย",
+            "get_sales_docs", "ยอดขาย", "ลีด", "ปิดการขาย",
+        )
+        is_sales_data_query = any(m in message_lower for m in sales_doc_markers)
+
+        rag_markers = (
+            "ขั้นตอน", "วิธีทำ", "วิธีใช้", "sop", "นโยบาย", "คู่มือ",
+            "procedure", "how to", "แนวทาง", "กระบวนการ", "onboarding",
+        )
+        is_rag_style = any(m in message_lower for m in rag_markers) or (
+            "document" in content and not is_sales_data_query
+        )
+
+        if not tool_calls and is_rag_style and not is_sales_data_query:
             intent = "rag_query"
-            confidence = 0.8
-        
-        # Check for clarify patterns
-        elif "unclear" in content or "clarify" in content or len(user_message.strip()) < 5:
+            confidence = 0.85
+        elif not tool_calls and ("unclear" in content or "clarify" in content or len(user_message.strip()) < 5):
             intent = "clarify"
             confidence = 0.5
         

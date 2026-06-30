@@ -1,10 +1,13 @@
 """
 LINE Webhook API Endpoint
 """
-from fastapi import APIRouter, Request, HTTPException, Header
-from typing import Optional
-from app.utils.logger import get_logger
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
+
+from app.config import settings
 from app.core.audit import log_audit
+from app.services.line import parse_webhook_events, verify_line_signature
+from app.services.line_handler import dispatch_line_event
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -13,34 +16,32 @@ router = APIRouter()
 @router.post("/line/webhook")
 async def line_webhook(
     request: Request,
-    x_line_signature: Optional[str] = Header(None)
+    background_tasks: BackgroundTasks,
+    x_line_signature: str | None = Header(None, alias="X-Line-Signature"),
 ):
     """
-    LINE webhook endpoint
-    Receives and processes LINE messages
+    LINE webhook endpoint.
+    Verifies signature, returns 200 immediately, processes events in background.
     """
-    try:
-        # Get request body
-        body = await request.body()
-        
-        # TODO: Verify LINE signature in Phase 4
-        # from linebot import LineBotApi, WebhookHandler
-        # handler = WebhookHandler(channel_secret)
-        # handler.handle(body, x_line_signature)
-        
-        # TODO: Process LINE events in Phase 4
-        logger.info("LINE webhook received (not yet implemented)")
-        
-        # Log webhook
+    body = await request.body()
+
+    if not settings.LINE_CHANNEL_SECRET:
+        raise HTTPException(status_code=503, detail="LINE not configured")
+
+    if not verify_line_signature(body, x_line_signature, settings.LINE_CHANNEL_SECRET):
+        logger.warning("Invalid LINE webhook signature")
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    events = parse_webhook_events(body)
+    for event in events:
+        background_tasks.add_task(dispatch_line_event, event)
+
+    if events:
         await log_audit(
             user_id="line-system",
             action="line_webhook",
             resource="line",
-            request_data={"signature": x_line_signature}
+            metadata={"event_count": len(events)},
         )
-        
-        return {"status": "ok"}
-    
-    except Exception as e:
-        logger.error(f"LINE webhook error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+
+    return {"status": "ok"}

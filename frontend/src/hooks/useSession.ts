@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
+import apiClient from '@/lib/api/client'
 
 interface Session {
   id: string
@@ -41,8 +42,24 @@ export function useSession() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [currentSession, setCurrentSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const supabase = createClient()
+
+  const setActiveSessionOnBackend = useCallback(
+    async (sessionId: string) => {
+      if (!session?.access_token) return
+      try {
+        await apiClient.patch(
+          '/api/v1/chat/active-session',
+          { session_id: sessionId },
+          { headers: { Authorization: `Bearer ${session.access_token}` } }
+        )
+      } catch (error) {
+        console.error('Failed to sync active session:', error)
+      }
+    },
+    [session?.access_token]
+  )
 
   const loadSessions = useCallback(async () => {
     if (!user) return
@@ -59,7 +76,7 @@ export function useSession() {
       if (error) throw error
 
       const sessionsData = (data || []) as Session[]
-      const sessionIds = sessionsData.map((session) => session.id)
+      const sessionIds = sessionsData.map((s) => s.id)
       const previewBySessionId: Record<string, string> = {}
       const fallbackPreviewBySessionId: Record<string, string> = {}
 
@@ -80,20 +97,41 @@ export function useSession() {
             fallbackPreviewBySessionId[msg.session_id] = messagePreview
           }
 
-          // Prefer user's question over assistant response for session preview.
           if (msg.role === 'user' && !previewBySessionId[msg.session_id]) {
             previewBySessionId[msg.session_id] = messagePreview
           }
         }
       }
 
-      const withPreview = sessionsData.map((session) => ({
-        ...session,
-        preview: previewBySessionId[session.id] || fallbackPreviewBySessionId[session.id] || undefined,
+      const withPreview = sessionsData.map((s) => ({
+        ...s,
+        preview: previewBySessionId[s.id] || fallbackPreviewBySessionId[s.id] || undefined,
       }))
 
       setSessions(withPreview)
-      if (data && data.length > 0 && !currentSession) {
+
+      let activeId: string | null = null
+      if (session?.access_token) {
+        try {
+          const { data: activeData } = await apiClient.get<{ session_id: string }>(
+            '/api/v1/chat/active-session',
+            { headers: { Authorization: `Bearer ${session.access_token}` } }
+          )
+          activeId = activeData?.session_id || null
+        } catch {
+          activeId = null
+        }
+      }
+
+      if (activeId) {
+        const active = withPreview.find((s) => s.id === activeId)
+        if (active) {
+          setCurrentSession(active)
+          return
+        }
+      }
+
+      if (withPreview.length > 0) {
         setCurrentSession(withPreview[0])
       }
     } catch (error) {
@@ -101,7 +139,7 @@ export function useSession() {
     } finally {
       setLoading(false)
     }
-  }, [user, currentSession])
+  }, [user, session?.access_token, supabase])
 
   useEffect(() => {
     if (user) {
@@ -133,32 +171,45 @@ export function useSession() {
       }
       setSessions((prev) => [newSession, ...prev])
       setCurrentSession(newSession)
+      await setActiveSessionOnBackend(newSession.id)
 
       return newSession
     },
-    [user]
+    [user, supabase, setActiveSessionOnBackend]
   )
 
-  const switchSession = useCallback((sessionId: string) => {
-    const session = sessions.find((s) => s.id === sessionId)
-    if (session) {
-      setCurrentSession(session)
-    }
-  }, [sessions])
+  const switchSession = useCallback(
+    (sessionId: string) => {
+      const s = sessions.find((x) => x.id === sessionId)
+      if (s) {
+        setCurrentSession(s)
+        void setActiveSessionOnBackend(sessionId)
+      }
+    },
+    [sessions, setActiveSessionOnBackend]
+  )
 
   const deleteSession = useCallback(
     async (sessionId: string) => {
       if (!user) return
 
       try {
-        const { error } = await supabase.from('chat_sessions').delete().eq('id', sessionId).eq('user_id', user.id)
+        const { error } = await supabase
+          .from('chat_sessions')
+          .delete()
+          .eq('id', sessionId)
+          .eq('user_id', user.id)
 
         if (error) throw error
 
         setSessions((prev) => {
           const filtered = prev.filter((s) => s.id !== sessionId)
           if (currentSession?.id === sessionId) {
-            setCurrentSession(filtered[0] || null)
+            const next = filtered[0] || null
+            setCurrentSession(next)
+            if (next) {
+              void setActiveSessionOnBackend(next.id)
+            }
           }
           return filtered
         })
@@ -166,7 +217,7 @@ export function useSession() {
         console.error('Failed to delete session:', error)
       }
     },
-    [user, currentSession]
+    [user, currentSession, supabase, setActiveSessionOnBackend]
   )
 
   const renameSession = useCallback(
@@ -184,9 +235,7 @@ export function useSession() {
         if (error) throw error
 
         setSessions((prev) =>
-          prev.map((session) =>
-            session.id === sessionId ? { ...session, title: normalizedTitle } : session
-          )
+          prev.map((s) => (s.id === sessionId ? { ...s, title: normalizedTitle } : s))
         )
 
         setCurrentSession((prev) =>
@@ -196,7 +245,7 @@ export function useSession() {
         console.error('Failed to rename session:', error)
       }
     },
-    [user]
+    [user, supabase]
   )
 
   const updateSessionPreview = useCallback((sessionId: string, messageContent: string) => {
@@ -204,20 +253,16 @@ export function useSession() {
     const nowIso = new Date().toISOString()
 
     setSessions((prev) => {
-      const updated = prev.map((session) =>
-        session.id === sessionId
-          ? { ...session, preview, updated_at: nowIso }
-          : session
+      const updated = prev.map((s) =>
+        s.id === sessionId ? { ...s, preview, updated_at: nowIso } : s
       )
-      return [...updated].sort((a, b) => (
-        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      ))
+      return [...updated].sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      )
     })
 
     setCurrentSession((prev) =>
-      prev?.id === sessionId
-        ? { ...prev, preview, updated_at: nowIso }
-        : prev
+      prev?.id === sessionId ? { ...prev, preview, updated_at: nowIso } : prev
     )
   }, [])
 

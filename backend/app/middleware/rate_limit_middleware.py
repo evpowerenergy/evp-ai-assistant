@@ -20,7 +20,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         user_id = getattr(request.state, "user_id", None)
         
         # Determine endpoint type
-        endpoint = "chat" if "/chat" in str(request.url) else "default"
+        path = str(request.url.path)
+        if "/chat" in path:
+            endpoint = "chat"
+        elif "/line/webhook" in path:
+            endpoint = "line_webhook"
+        else:
+            endpoint = "default"
         
         # Check rate limit
         is_allowed, remaining = await check_rate_limit(

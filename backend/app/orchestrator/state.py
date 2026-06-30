@@ -33,6 +33,7 @@ class AIAssistantState(TypedDict, total=False):
     # RAG results
     rag_results: List[Dict[str, Any]]
     citations: List[str]
+    rag_retrieval_meta: Optional[Dict[str, Any]]
     
     # Retry management (NEW)
     retry_count: int  # Number of retry attempts

@@ -1,6 +1,5 @@
 """
-RAG Query Node
-Searches documents using vector similarity
+RAG Query Node — hybrid search with observability metadata.
 """
 from typing import Dict, Any
 from app.orchestrator.state import AIAssistantState
@@ -11,29 +10,29 @@ logger = get_logger(__name__)
 
 
 async def rag_query_node(state: AIAssistantState) -> AIAssistantState:
-    """
-    Node that searches documents using RAG
-    """
+    """Search documents using production RAG pipeline."""
     try:
         user_message = state.get("user_message", "")
-        
-        logger.info(f"RAG Query Node: processing message")
-        
-        # Search documents
-        rag_results = await search_documents(user_message, limit=5)
-        
-        # Format citations
+
+        logger.info("RAG Query Node: processing message")
+
+        rag_results, retrieval_meta = await search_documents(user_message, limit=5)
         citations = format_citations(rag_results) if rag_results else []
-        
-        # Update state
+
         state["rag_results"] = rag_results
         state["citations"] = citations
-        
-        logger.info(f"RAG Query Node: found {len(rag_results)} relevant documents")
-        
+        state["rag_retrieval_meta"] = retrieval_meta
+
+        logger.info(
+            "RAG Query Node: found %s relevant documents (ms=%s)",
+            len(rag_results),
+            retrieval_meta.get("retrieval_ms"),
+        )
+
         return state
-    
+
     except Exception as e:
         logger.error(f"RAG Query Node error: {e}")
         state["error"] = str(e)
+        state["rag_retrieval_meta"] = {"error": str(e)}
         return state

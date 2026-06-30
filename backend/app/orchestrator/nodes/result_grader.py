@@ -251,19 +251,46 @@ def grade_result_rule_based(
 
 async def result_grader_node(state: AIAssistantState) -> AIAssistantState:
     """
-    Node that grades the quality of RPC results
+    Node that grades the quality of RPC or RAG results
     """
     try:
         user_message = state.get("user_message", "")
+        intent = state.get("intent", "")
         tool_results = state.get("tool_results", [])
+        rag_results = state.get("rag_results", [])
         previous_attempts = state.get("previous_attempts", [])
         retry_count = state.get("retry_count", 0)
-        
+
         logger.info(f"{'='*60}")
         logger.info(f"📊 [RESULT GRADER] Evaluating data quality")
+        logger.info(f"   Intent: {intent}")
         logger.info(f"   Tool results: {len(tool_results)} items")
+        logger.info(f"   RAG results: {len(rag_results)} items")
         logger.info(f"   Retry count: {retry_count}")
         logger.info(f"{'='*60}")
+
+        # RAG path: grade retrieval directly
+        if intent == "rag_query" and not tool_results:
+            if not rag_results:
+                state["data_quality"] = "empty"
+                state["quality_reason"] = "No relevant documents found in knowledge base"
+                state["suggested_retry_params"] = {}
+                logger.info("   RAG quality: empty (no chunks)")
+                return state
+
+            max_sim = max((r.get("similarity") or 0) for r in rag_results)
+            max_rerank = max((r.get("rerank_score") or 0) for r in rag_results)
+            if max_sim < 0.5 and max_rerank < 4:
+                state["data_quality"] = "insufficient"
+                state["quality_reason"] = (
+                    f"Low retrieval confidence (similarity={max_sim:.2f}, rerank={max_rerank})"
+                )
+            else:
+                state["data_quality"] = "sufficient"
+                state["quality_reason"] = f"Found {len(rag_results)} relevant document chunks"
+            state["suggested_retry_params"] = {}
+            logger.info("   RAG quality: %s", state["data_quality"])
+            return state
         
         # Grade results
         quality, reason, suggested_params = await grade_result_with_llm(
