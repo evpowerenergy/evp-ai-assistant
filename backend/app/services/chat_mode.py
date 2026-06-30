@@ -115,13 +115,17 @@ def line_quick_reply_items() -> list:
     return [
         {
             "type": "action",
-            "action": {"type": "message", "label": "CRM", "text": "MODE CRM"},
+            "action": {
+                "type": "message",
+                "label": "Mode: CRM",
+                "text": "MODE CRM",
+            },
         },
         {
             "type": "action",
             "action": {
                 "type": "message",
-                "label": "เอกสารบริษัท",
+                "label": "Mode: เอกสารบริษัท",
                 "text": "MODE KB",
             },
         },
