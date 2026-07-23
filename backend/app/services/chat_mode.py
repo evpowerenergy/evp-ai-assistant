@@ -6,6 +6,7 @@ from __future__ import annotations
 import re
 from typing import Literal, Optional
 
+from app.config import settings
 from app.orchestrator.llm_router import (
     _message_has_data_keyword,
     _message_has_live_data_intent,
@@ -112,6 +113,8 @@ async def set_chat_mode(user_id: str, mode: str) -> ChatMode:
 
 def line_quick_reply_items() -> list:
     """Quick Reply actions for switching chat mode on LINE."""
+    if settings.AI_PRIMARY_ENGINE.strip().lower() == "hermes":
+        return []
     return [
         {
             "type": "action",

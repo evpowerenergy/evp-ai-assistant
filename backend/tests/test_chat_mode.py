@@ -13,6 +13,7 @@ from app.services.chat_mode import (
     KB_MODE_SWITCH_HINT,
     get_chat_mode,
     is_crm_style_question,
+    line_quick_reply_items,
     normalize_chat_mode,
     parse_mode_command,
     set_chat_mode,
@@ -33,6 +34,22 @@ def test_normalize_chat_mode():
     assert normalize_chat_mode("DOC") == "kb"
     assert normalize_chat_mode(None) == "crm"
     assert normalize_chat_mode("crm") == "crm"
+
+
+def test_line_mode_quick_replies_hidden_for_hermes(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.chat_mode.settings.AI_PRIMARY_ENGINE",
+        "hermes",
+    )
+    assert line_quick_reply_items() == []
+
+
+def test_line_mode_quick_replies_kept_for_langgraph(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.chat_mode.settings.AI_PRIMARY_ENGINE",
+        "langgraph",
+    )
+    assert len(line_quick_reply_items()) == 2
 
 
 def test_is_crm_style_question():
