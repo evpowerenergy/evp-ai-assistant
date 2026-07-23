@@ -19,4 +19,7 @@ data_dir.mkdir(parents=True, exist_ok=True)
 _write_secret("HERMES_CONFIG_YAML", data_dir / "config.yaml")
 _write_secret("HERMES_AUTH_JSON", data_dir / "auth.json")
 
-os.execvp("gateway", ["gateway", "run"])
+os.execv(
+    "/opt/hermes/.venv/bin/hermes",
+    ["hermes", "gateway", "run"],
+)
