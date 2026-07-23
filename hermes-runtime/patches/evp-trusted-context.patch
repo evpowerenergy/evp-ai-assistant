@@ -5,7 +5,7 @@ index 5ba09d6..0a3b1d2 100644
 @@ -2187,6 +2187,16 @@ class APIServerAdapter(BasePlatformAdapter):
              session_id = _derive_chat_session_id(system_prompt, first_user)
              # history already set from request body above
-
+ 
 +        # EVP integration: bind the signed capability to the trusted session
 +        # out-of-band. It is never added to messages, schemas, or model input.
 +        execution_token = request.headers.get("X-EVP-Execution-Token", "").strip()
@@ -61,3 +61,4 @@ index cd999f2..2a5ca91 100644
 -        "parameters": _normalize_mcp_input_schema(getattr(mcp_tool, "inputSchema", None)),
 +        "parameters": parameters,
      }
+ 
