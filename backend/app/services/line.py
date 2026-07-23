@@ -85,6 +85,16 @@ def _text_message_with_quick_reply(
     return msg
 
 
+def _message_with_quick_reply(
+    message: Dict[str, Any],
+    quick_reply_items: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    output = dict(message)
+    if quick_reply_items:
+        output["quickReply"] = {"items": quick_reply_items[:13]}
+    return output
+
+
 async def reply_message_with_quick_reply(
     reply_token: str,
     text: str,
@@ -143,6 +153,35 @@ async def push_message_with_quick_reply(
         return True
     except Exception as e:
         logger.error("LINE push error: %s", e)
+        return False
+
+
+async def push_flex_message(
+    line_user_id: str,
+    message: Dict[str, Any],
+    quick_reply_items: Optional[List[Dict[str, Any]]] = None,
+) -> bool:
+    """Push a Flex Message with optional context-aware Quick Replies."""
+    if not settings.LINE_CHANNEL_ACCESS_TOKEN or not line_user_id:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                LINE_PUSH_URL,
+                headers=_headers(),
+                json={
+                    "to": line_user_id,
+                    "messages": [
+                        _message_with_quick_reply(message, quick_reply_items)
+                    ],
+                },
+            )
+        if resp.status_code >= 400:
+            logger.error("LINE Flex push failed: %s %s", resp.status_code, resp.text[:500])
+            return False
+        return True
+    except Exception as e:
+        logger.error("LINE Flex push error: %s", e)
         return False
 
 
@@ -254,19 +293,16 @@ async def start_ai_search_feedback(
     reply_token: Optional[str] = None,
     text: str = "🔍 กำลังค้นหาข้อมูล...",
 ) -> None:
-    """
-    Immediate visible feedback while AI runs.
-    Always sends a chat message (reply preferred), plus native loading animation when available.
-    """
-    if reply_token:
-        replied = await reply_message(reply_token, text)
-        if not replied:
-            await push_message(line_user_id, text)
-    else:
-        await push_message(line_user_id, text)
-
+    """Show native loading animation, using a text bubble only as fallback."""
     seconds = getattr(settings, "LINE_LOADING_SECONDS", 60) or 60
-    await send_loading_indicator(line_user_id, seconds=seconds)
+    loading_started = await send_loading_indicator(line_user_id, seconds=seconds)
+    if not loading_started:
+        if reply_token:
+            replied = await reply_message(reply_token, text)
+            if not replied:
+                await push_message(line_user_id, text)
+        else:
+            await push_message(line_user_id, text)
 
     pkg = (getattr(settings, "LINE_STICKER_PACKAGE_ID", "") or "").strip()
     sticker = (getattr(settings, "LINE_STICKER_ID_LOADING", "") or "").strip()

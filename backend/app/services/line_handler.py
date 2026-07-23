@@ -8,7 +8,11 @@ from typing import Any, Dict, Optional
 from app.config import settings
 from app.core.audit import log_audit
 from app.core.rate_limit import check_rate_limit
-from app.orchestrator.formatters.line_response import format_for_line
+from app.orchestrator.formatters.line_response import (
+    build_ai_flex_message,
+    build_dynamic_quick_replies,
+    format_for_line,
+)
 from app.services.active_session import get_active_session
 from app.services.chat_mode import (
     get_chat_mode,
@@ -21,6 +25,7 @@ from app.services.chat_mode import (
 from app.services.chat_processor import run_chat_turn
 from app.services.line import (
     push_message,
+    push_flex_message,
     push_message_with_quick_reply,
     reply_message,
     reply_message_with_quick_reply,
@@ -237,14 +242,33 @@ async def handle_line_text_message(
             result.get("response", ""),
             result.get("citations"),
         )
-        outgoing = prefix_response_with_mode(
-            formatted, result.get("chat_mode", chat_mode)
+        quick_replies = build_dynamic_quick_replies(
+            question=text,
+            response=result.get("response", ""),
+            intent=result.get("intent"),
+            citations=result.get("citations"),
         )
-        await push_message_with_quick_reply(
+        flex_message = build_ai_flex_message(
+            result.get("response", ""),
+            citations=result.get("citations"),
+            runtime=result.get("runtime"),
+            model=result.get("model"),
+            engine=result.get("engine"),
+            fallback_used=bool(result.get("fallback_used")),
+            question=text,
+            intent=result.get("intent"),
+        )
+        sent = await push_flex_message(
             line_user_id,
-            outgoing,
-            line_quick_reply_items(),
+            flex_message,
+            quick_replies,
         )
+        if not sent:
+            await push_message_with_quick_reply(
+                line_user_id,
+                formatted,
+                quick_replies,
+            )
         await log_audit(
             user_id=user_id,
             action="line_message",

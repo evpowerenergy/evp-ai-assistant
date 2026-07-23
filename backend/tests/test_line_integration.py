@@ -8,7 +8,11 @@ import json
 
 import pytest
 
-from app.orchestrator.formatters.line_response import format_for_line
+from app.orchestrator.formatters.line_response import (
+    build_ai_flex_message,
+    build_dynamic_quick_replies,
+    format_for_line,
+)
 from app.services.line import split_text_for_line, verify_line_signature, parse_webhook_events
 
 LINK_CODE_PATTERN = "LINK"
@@ -67,3 +71,43 @@ def test_format_for_line_strips_markdown():
     assert "**" not in text
     assert "อ้างอิง" in text
     assert "example.com" in text
+
+
+def test_build_ai_flex_message_contains_real_runtime_and_model():
+    message = build_ai_flex_message(
+        "**ยอดขาย** เดือนนี้ 1,000,000 บาท",
+        runtime=1.25,
+        model="gpt-5.6-luna",
+        engine="hermes",
+        question="ยอดขายเดือนนี้",
+    )
+
+    assert message["type"] == "flex"
+    assert len(message["altText"]) <= 400
+    assert message["contents"]["type"] == "bubble"
+    footer = message["contents"]["footer"]["contents"]
+    assert footer[0]["contents"][0]["text"] == "⚡ 1.2s"
+    assert footer[0]["contents"][1]["text"] == "gpt-5.6-luna"
+    assert "Confidence" not in json.dumps(message)
+
+
+def test_dynamic_quick_replies_follow_marketing_context():
+    items = build_dynamic_quick_replies(
+        question="ROAS เดือนนี้เป็นอย่างไร",
+        response="ROAS เท่ากับ 4.2",
+    )
+
+    labels = [item["action"]["label"] for item in items]
+    assert labels == ["📈 เทียบช่วงก่อน", "🎯 เจาะ ROAS", "🔍 ดู Conversion"]
+    assert all(len(item["action"]["label"]) <= 20 for item in items)
+    assert all(len(item["action"]["text"]) <= 300 for item in items)
+
+
+def test_dynamic_quick_replies_offer_citations_when_available():
+    items = build_dynamic_quick_replies(
+        question="ยอดขายเดือนนี้",
+        response="ยอดขายรวม 1,000,000 บาท",
+        citations=["https://example.com/source"],
+    )
+
+    assert items[-1]["action"]["label"] == "📚 ดูแหล่งอ้างอิง"
