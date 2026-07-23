@@ -73,7 +73,7 @@ def test_format_for_line_strips_markdown():
     assert "example.com" in text
 
 
-def test_build_ai_flex_message_contains_real_runtime_and_model():
+def test_build_ai_flex_message_hides_runtime_and_model():
     message = build_ai_flex_message(
         "**ยอดขาย** เดือนนี้ 1,000,000 บาท",
         runtime=1.25,
@@ -85,10 +85,11 @@ def test_build_ai_flex_message_contains_real_runtime_and_model():
     assert message["type"] == "flex"
     assert len(message["altText"]) <= 400
     assert message["contents"]["type"] == "bubble"
-    footer = message["contents"]["footer"]["contents"]
-    assert footer[0]["contents"][0]["text"] == "⚡ 1.2s"
-    assert footer[0]["contents"][1]["text"] == "gpt-5.6-luna"
-    assert "Confidence" not in json.dumps(message)
+    payload = json.dumps(message)
+    assert "footer" not in message["contents"]
+    assert "1.2s" not in payload
+    assert "gpt-5.6-luna" not in payload
+    assert "Confidence" not in payload
 
 
 def test_dynamic_quick_replies_follow_marketing_context():
@@ -101,6 +102,17 @@ def test_dynamic_quick_replies_follow_marketing_context():
     assert labels == ["📈 เทียบช่วงก่อน", "🎯 เจาะ ROAS", "🔍 ดู Conversion"]
     assert all(len(item["action"]["label"]) <= 20 for item in items)
     assert all(len(item["action"]["text"]) <= 300 for item in items)
+
+
+def test_dynamic_quick_replies_do_not_offer_appointments():
+    items = build_dynamic_quick_replies(
+        question="ช่วยสรุปลีดใหม่",
+        response="มีลีดใหม่ 10 ราย",
+    )
+
+    labels = [item["action"]["label"] for item in items]
+    assert labels == ["🔍 เจาะรายละเอียด", "📊 สรุปตามสถานะ"]
+    assert "📅 ดูนัดหมาย" not in labels
 
 
 def test_dynamic_quick_replies_offer_citations_when_available():

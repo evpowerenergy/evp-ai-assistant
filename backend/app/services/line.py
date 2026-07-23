@@ -248,11 +248,18 @@ async def send_loading_indicator(line_user_id: str, seconds: int = 60) -> bool:
             )
             if resp.status_code >= 400:
                 logger.warning(
-                    "LINE loading animation failed: %s %s — enable 'Use loading animation' in LINE OA Console",
+                    "LINE loading animation failed: status=%s request_id=%s body=%s",
                     resp.status_code,
+                    resp.headers.get("x-line-request-id", "-"),
                     resp.text[:200],
                 )
                 return False
+            logger.info(
+                "LINE loading animation accepted: status=%s request_id=%s duration=%ss",
+                resp.status_code,
+                resp.headers.get("x-line-request-id", "-"),
+                duration,
+            )
             return True
     except Exception as e:
         logger.warning("LINE loading indicator error: %s", e)

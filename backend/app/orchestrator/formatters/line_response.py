@@ -81,7 +81,6 @@ def build_dynamic_quick_replies(
         ],
         "lead": [
             ("🔍 เจาะรายละเอียด", "ขอเจาะลึกรายละเอียดของลีดจากคำตอบล่าสุด"),
-            ("📅 ดูนัดหมาย", "แสดงนัดหมายที่เกี่ยวข้องกับคำตอบล่าสุด"),
             ("📊 สรุปตามสถานะ", "สรุปลีดแยกตามสถานะจากข้อมูลล่าสุด"),
         ],
         "sales": [
@@ -131,9 +130,6 @@ def build_ai_flex_message(
         "knowledge": "KNOWLEDGE BRIEF",
         "general": "AI AGENT ANALYSIS",
     }
-    runtime_label = f"{runtime:.1f}s" if isinstance(runtime, (int, float)) else "พร้อมใช้งาน"
-    model_label = (model or engine or "AI Agent").strip()
-    status_label = "Fallback completed" if fallback_used else "Analysis completed"
     alt_text = re.sub(r"\s+", " ", formatted).strip()[:350] or "EVP AI วิเคราะห์ข้อมูลเรียบร้อยแล้ว"
 
     message: Dict[str, Any] = {
@@ -144,7 +140,6 @@ def build_ai_flex_message(
             "size": "kilo",
             "styles": {
                 "header": {"backgroundColor": "#07111F"},
-                "footer": {"backgroundColor": "#F4F8FC"},
             },
             "header": {
                 "type": "box",
@@ -215,40 +210,6 @@ def build_ai_flex_message(
                         "color": "#243B53",
                         "margin": "lg",
                         "lineSpacing": "6px",
-                    },
-                ],
-            },
-            "footer": {
-                "type": "box",
-                "layout": "vertical",
-                "paddingAll": "16px",
-                "contents": [
-                    {
-                        "type": "box",
-                        "layout": "horizontal",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": f"⚡ {runtime_label}",
-                                "size": "xs",
-                                "color": "#246B7A",
-                                "flex": 0,
-                            },
-                            {
-                                "type": "text",
-                                "text": model_label[:28],
-                                "size": "xs",
-                                "color": "#627D98",
-                                "align": "end",
-                            },
-                        ],
-                    },
-                    {
-                        "type": "text",
-                        "text": status_label,
-                        "size": "xxs",
-                        "color": "#829AB1",
-                        "margin": "sm",
                     },
                 ],
             },
