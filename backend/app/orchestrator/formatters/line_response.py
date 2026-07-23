@@ -137,7 +137,7 @@ def build_ai_flex_message(
         "altText": f"EVP AI: {alt_text}"[:400],
         "contents": {
             "type": "bubble",
-            "size": "kilo",
+            "size": "giga",
             "styles": {
                 "header": {"backgroundColor": "#07111F"},
             },

@@ -85,6 +85,7 @@ def test_build_ai_flex_message_hides_runtime_and_model():
     assert message["type"] == "flex"
     assert len(message["altText"]) <= 400
     assert message["contents"]["type"] == "bubble"
+    assert message["contents"]["size"] == "giga"
     payload = json.dumps(message)
     assert "footer" not in message["contents"]
     assert "1.2s" not in payload
