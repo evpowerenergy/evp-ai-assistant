@@ -96,6 +96,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Error getting session:', error)
+        // A revoked/expired refresh token can remain in browser storage and
+        // make every page load retry the same failed refresh. Clear only the
+        // local session; no server-side session is usable at this point.
+        await supabase.auth.signOut({ scope: 'local' })
         setSession(null)
         setUser(null)
         setUserRole(null)
@@ -113,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (refreshError) {
             console.error('Error refreshing session:', refreshError)
+            await supabase.auth.signOut({ scope: 'local' })
             setSession(null)
             setUser(null)
             setUserRole(null)

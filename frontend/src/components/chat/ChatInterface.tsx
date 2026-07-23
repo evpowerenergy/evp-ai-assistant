@@ -23,7 +23,7 @@ function getHeaderSessionTitle(session?: { title?: string; preview?: string } | 
 
 export function ChatInterface() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { messages, sendMessage, loadMessages, clearMessages, loading, error, processSteps, runtime, toolResults, debugPrecompute } = useChat()
+  const { messages, sendMessage, loadMessages, clearMessages, loading, error, processSteps, runtime, toolResults, debugPrecompute, agentRuntime } = useChat()
   const { mode: chatMode, setMode: setChatMode, modeLabel } = useChatMode()
   const { currentSession, sessions, createSession, switchSession, deleteSession, renameSession, updateSessionPreview } = useSession()
   const { config: modelConfig } = useConfig()
@@ -144,11 +144,7 @@ export function ChatInterface() {
         <MessageInput
           onSend={handleSendMessage}
           disabled={loading}
-          placeholder={
-            chatMode === 'kb'
-              ? 'ถามเกี่ยวกับ SOP, นโยบาย, ข้อมูลอ้างอิงบริษัท…'
-              : 'ถามเกี่ยวกับลีด, ยอดขาย, นัด, Marketing…'
-          }
+          placeholder="ถามได้ทุกเรื่อง เช่น ลีด ยอดขาย Marketing หรือข้อมูลบริษัท…"
           modeToggle={
             <ChatModeToggle mode={chatMode} onChange={setChatMode} disabled={loading} />
           }
@@ -165,6 +161,7 @@ export function ChatInterface() {
         loadingHistory={isLoadingHistory}
         modelConfig={modelConfig}
         chatMode={chatMode}
+        agentRuntime={agentRuntime}
       />
     </div>
   )

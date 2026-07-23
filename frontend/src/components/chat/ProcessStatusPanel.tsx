@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { ConfigInfo } from '@/hooks/useConfig'
+import type { AgentRuntimeInfo } from '@/hooks/useChat'
 
 interface ProcessStep {
   name: string
@@ -23,9 +24,10 @@ interface ProcessStatusPanelProps {
   loadingHistory?: boolean
   modelConfig?: ConfigInfo | null
   chatMode?: 'crm' | 'kb'
+  agentRuntime?: AgentRuntimeInfo | null
 }
 
-export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults, debugPrecompute, loadingHistory, modelConfig, chatMode }: ProcessStatusPanelProps) {
+export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults, debugPrecompute, loadingHistory, modelConfig, chatMode, agentRuntime }: ProcessStatusPanelProps) {
   const [elapsedTime, setElapsedTime] = useState(0)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
@@ -202,16 +204,14 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
       {/* Header - ชื่อ + Model + Runtime แยกบรรทัด ไม่ให้บัง */}
       <div className="flex shrink-0 flex-col gap-1 border-b border-neutral-200 p-3 dark:border-neutral-800">
         <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">สถานะการประมวลผล</h3>
-        {modelConfig && (
-          <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
-            Model: <span className="font-mono text-neutral-800 dark:text-neutral-200">{modelConfig.openai_model}</span>
-            <span className="ml-1 font-normal text-muted-foreground">({modelConfig.agents_count} agents)</span>
-          </p>
-        )}
+        <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+          Agent: <span className="font-semibold text-indigo-600 dark:text-indigo-300">{agentRuntime?.engine === 'langgraph' ? 'LangGraph Fallback' : 'Hermes Auto'}</span>
+          <span className="ml-1 font-mono text-neutral-800 dark:text-neutral-200">· {agentRuntime?.model || modelConfig?.primary_model || 'gpt-5.6-luna'}</span>
+        </p>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
           {chatMode && (
             <span className="font-medium text-foreground">
-              โหมด: {chatMode === 'crm' ? 'CRM' : 'เอกสารบริษัท'}
+              โหมด: Hermes Auto
             </span>
           )}
           {runtime !== undefined && (
@@ -221,26 +221,35 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
             <span className="text-blue-600">กำลังทำงาน: {formatTime(elapsedTime)}</span>
           )}
         </div>
+
       </div>
 
       {/* Scrollable Content Area */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-3">
-        {/* Agents และ Model ที่ใช้ (แยกแต่ละตัว) */}
-        {modelConfig && modelConfig.agents.length > 0 && (
-          <div>
-            <h4 className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Agents และ Model</h4>
-            <div className="rounded-lg border border-neutral-200 bg-white p-2.5 dark:border-neutral-700 dark:bg-neutral-900/50">
-              <ul className="space-y-2">
-                {modelConfig.agents.map((agent, i) => (
-                  <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-xs">
-                    <span className="text-foreground">{agent.name}</span>
-                    <span className="shrink-0 font-mono text-neutral-600 dark:text-neutral-300">{agent.model}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+        {/* Current Hermes-first architecture. */}
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Agent Runtime</h4>
+          <div className="space-y-1.5 rounded-lg border border-neutral-200 bg-white p-2 dark:border-neutral-700 dark:bg-neutral-900/50">
+            {[
+              { label: 'FastAPI Gateway', detail: 'Auth · Session · History', state: loading || agentRuntime ? 'completed' : 'pending' },
+              { label: 'Hermes Auto', detail: agentRuntime?.model || modelConfig?.primary_model || 'gpt-5.6-luna', state: loading ? 'processing' : agentRuntime?.engine === 'hermes' ? 'completed' : agentRuntime?.fallbackUsed ? 'error' : 'pending' },
+              { label: 'EVP MCP Gateway', detail: toolResults?.length ? `${toolResults.length} tool result(s)` : 'Tools พร้อมใช้งาน', state: loading ? 'processing' : toolResults?.length ? 'completed' : 'pending' },
+              { label: 'Supabase / EVP Services', detail: 'Business data · Knowledge', state: toolResults?.length ? 'completed' : 'pending' },
+              { label: 'คำตอบสุดท้าย', detail: agentRuntime?.requestId ? `Run ${agentRuntime.requestId.slice(0, 8)}` : 'รอการประมวลผล', state: agentRuntime && !loading ? 'completed' : loading ? 'processing' : 'pending' },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center gap-2 rounded-md border border-neutral-100 px-2 py-1.5 dark:border-neutral-800">
+                {getStepIcon(item.state as ProcessStep['status'])}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-foreground">{item.label}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">{item.detail}</p>
+                </div>
+              </div>
+            ))}
           </div>
-        )}
+          <div className={`mt-1.5 rounded-md border px-2 py-1.5 text-[11px] ${agentRuntime?.fallbackUsed ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300' : 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/40 dark:text-neutral-400'}`}>
+            LangGraph fallback: {agentRuntime?.fallbackUsed ? 'ใช้งานในคำขอนี้' : 'Standby'}
+          </div>
+        </div>
 
         {/* โหลด History */}
         <div>
@@ -268,8 +277,38 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
           </div>
         </div>
 
-        {/* สถานะการทำงาน - จำกัดความสูง + scroll */}
+        {/* Sanitized Hermes execution trace for the current request. */}
         <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Execution Log</h4>
+          <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-neutral-200 bg-[#111827] p-2 font-mono dark:border-neutral-700">
+            {agentRuntime?.logs && agentRuntime.logs.length > 0 ? (
+              agentRuntime.logs.map((event, index) => (
+                <div key={`${event.timestamp || 'event'}-${index}`} className="flex gap-2 text-[10px] leading-4 text-neutral-300">
+                  <span className={event.status === 'error' ? 'text-red-400' : event.type === 'skill' ? 'text-violet-400' : 'text-emerald-400'}>
+                    {event.status === 'error' ? 'ERR' : event.type === 'skill' ? 'SKL' : 'OK '}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="break-all text-neutral-100">{event.type === 'skill' ? `Skill · ${event.name}` : event.name}</p>
+                    <p className="text-neutral-500">
+                      {event.duration != null && `${event.duration.toFixed(2)}s`}
+                      {event.model && `model=${event.model}`}
+                      {event.api_calls && ` · calls=${event.api_calls}`}
+                      {event.tool_turns != null && ` · tools=${event.tool_turns}`}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : loading ? (
+              <p className="animate-pulse text-[10px] text-cyan-400">Hermes กำลังประมวลผล…</p>
+            ) : (
+              <p className="text-[10px] text-neutral-500">ส่งข้อความเพื่อดู tool trace ของคำขอนี้</p>
+            )}
+          </div>
+          <p className="mt-1 text-[10px] text-muted-foreground">แสดงเฉพาะชื่อ Tool, เวลา และสถานะ — ไม่แสดง token หรือ raw data</p>
+        </div>
+
+        {/* Legacy node details are relevant only when LangGraph handled the turn. */}
+        {agentRuntime?.fallbackUsed && processSteps && processSteps.length > 0 && <div>
           <h4 className="mb-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">สถานะการทำงาน</h4>
           {processSteps && processSteps.length > 0 ? (
             <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-lg border border-neutral-200 bg-neutral-100/80 p-1.5 dark:border-neutral-700 dark:bg-neutral-900/40">
@@ -308,7 +347,7 @@ export function ProcessStatusPanel({ loading, processSteps, runtime, toolResults
           ) : (
             <p className="py-2 text-center text-xs text-muted-foreground">ยังไม่มีการประมวลผล</p>
           )}
-        </div>
+        </div>}
 
         {/* Pre-compute (Debug) */}
         {debugPrecompute && Object.keys(debugPrecompute).length > 0 && (

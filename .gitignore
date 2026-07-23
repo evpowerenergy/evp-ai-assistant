@@ -4,6 +4,7 @@ venv/
 env/
 .venv/
 .venv-test/
+.venv-runtime/
 __pycache__/
 *.pyc
 *.pyo
@@ -15,12 +16,14 @@ __pycache__/
 .env.local
 .env.*.local
 .env.cloudrun
+env.cloudrun
 *.env
 
 # Build outputs
 dist/
 build/
 .next/
+.next-build/
 out/
 *.egg-info/
 
@@ -61,6 +64,7 @@ dmypy.json
 # Temporary files
 tmp/
 temp/
+supabase/.temp/
 *.tmp
 
 # OS

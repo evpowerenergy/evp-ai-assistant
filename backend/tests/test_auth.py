@@ -2,11 +2,42 @@
 Authentication tests
 """
 import pytest
+import jwt
+import time
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.auth import verify_jwt_token, get_user_from_token
 
 client = TestClient(app)
+
+
+@pytest.mark.asyncio
+async def test_verify_hs256_token_checks_signature(monkeypatch):
+    monkeypatch.setattr("app.core.auth.settings.SUPABASE_JWT_SECRET", "test-secret")
+    token = jwt.encode(
+        {
+            "sub": "user-123",
+            "aud": "authenticated",
+            "exp": int(time.time()) + 60,
+            "email": "test@example.com",
+        },
+        "test-secret",
+        algorithm="HS256",
+    )
+    payload = await verify_jwt_token(token)
+    assert payload["sub"] == "user-123"
+
+
+@pytest.mark.asyncio
+async def test_verify_hs256_rejects_wrong_signature(monkeypatch):
+    monkeypatch.setattr("app.core.auth.settings.SUPABASE_JWT_SECRET", "test-secret")
+    token = jwt.encode(
+        {"sub": "user-123", "aud": "authenticated", "exp": int(time.time()) + 60},
+        "wrong-secret",
+        algorithm="HS256",
+    )
+    with pytest.raises(Exception):
+        await verify_jwt_token(token)
 
 
 def test_health_without_auth():

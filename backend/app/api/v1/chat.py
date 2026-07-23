@@ -5,15 +5,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any, Literal
+import asyncio
 import time
 import json
 from app.core.auth import require_ai_assistant_access
-from app.orchestrator.graph import process_message_stream
 from app.orchestrator.state import AIAssistantState
-from app.services.active_session import get_active_session, set_active_session
+from app.services.active_session import assert_session_owner, get_active_session, set_active_session
 from app.services.chat_mode import get_chat_mode, set_chat_mode
 from app.services.chat_processor import run_chat_turn
-from app.services.chat_history import load_chat_history, format_history_for_llm, save_message
+from app.services.chat_history import load_chat_history, save_message
+from app.engines.hermes import HermesEngine
+from app.config import settings
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -40,6 +42,11 @@ class ChatResponse(BaseModel):
     process_steps: Optional[List[Dict[str, Any]]] = None  # NEW: Process steps
     runtime: Optional[float] = None  # NEW: Total runtime in seconds
     debug_precompute: Optional[Dict[str, Any]] = None  # NEW: Pre-computed summaries for UI debug
+    engine: Optional[str] = None
+    model: Optional[str] = None
+    fallback_used: bool = False
+    request_id: Optional[str] = None
+    runtime_logs: Optional[List[Dict[str, Any]]] = None
 
 
 class ActiveSessionRequest(BaseModel):
@@ -138,10 +145,17 @@ async def chat(
             process_steps=process_steps,
             runtime=runtime,
             debug_precompute=turn.get("debug_precompute"),
+            engine=turn.get("engine"),
+            model=turn.get("model"),
+            fallback_used=bool(turn.get("fallback_used")),
+            request_id=turn.get("request_id"),
+            runtime_logs=turn.get("runtime_logs", []),
         )
         
         return response
     
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Chat error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -152,217 +166,71 @@ async def chat_stream(
     request: ChatRequest,
     current_user: dict = Depends(require_ai_assistant_access)
 ):
-    """
-    Streaming chat endpoint
-    Streams process steps in real-time using Server-Sent Events (SSE)
-    """
+    """SSE endpoint using the same AgentService path as non-stream chat."""
     async def generate():
         try:
             user_id = current_user.get("id")
             logger.info(f"Streaming chat request from user {user_id}: {request.message[:50]}...")
-            
-            # Get or create session
             session_id = request.session_id
             if not session_id:
                 session_id = await get_active_session(user_id, first_message=request.message)
             else:
                 await set_active_session(user_id, session_id)
-            
-            # Load chat history for context (exclude_current=False so we include all previous turns)
-            chat_history = await load_chat_history(session_id, limit=20, exclude_current=False)
-            history_context = format_history_for_llm(chat_history, max_tokens=2000) if chat_history else ""
-            
-            logger.info(f"Streaming: Loaded {len(chat_history)} messages from history for session {session_id}")
-            
-            # Start timing
+            await assert_session_owner(user_id, session_id)
             start_time = time.time()
-            
-            # Create initial state
-            user_role = current_user.get("role", "staff")
-            resolved_mode = (
-                request.chat_mode
-                if request.chat_mode
-                else await get_chat_mode(user_id)
+            yield f"data: {json.dumps({'type': 'run.started', 'node': 'agent', 'display_name': 'กำลังประมวลผล', 'status': 'processing', 'session_id': session_id})}\n\n"
+            # Hermes writes a sanitized local execution log. Poll only the
+            # bytes appended after this request starts and forward new events
+            # over SSE while the turn is still running.
+            log_offset = HermesEngine._log_offset()
+            skill_baseline = HermesEngine._skill_usage_snapshot()
+            emitted_skills: set[tuple[str, str]] = set()
+            turn_task = asyncio.create_task(
+                run_chat_turn(
+                    user_id=user_id,
+                    user_role=current_user.get("role", "staff"),
+                    message=request.message,
+                    session_id=session_id,
+                    source="web",
+                    chat_mode=request.chat_mode,
+                )
             )
-            initial_state: AIAssistantState = {
-                "user_message": request.message,
-                "user_id": user_id,
-                "user_role": user_role,
-                "session_id": session_id,
-                "chat_mode": resolved_mode,
-                "chat_history": chat_history,  # NEW: Chat history for context
-                "history_context": history_context,  # NEW: Formatted history context
-                "intent": None,
-                "confidence": 0.0,
-                "tool_calls": [],
-                "tool_results": [],
-                "rag_results": [],
-                "citations": [],
-                "retry_count": 0,
-                "max_retries": 0,  # Disabled: Retry mechanism causes incorrect parameters
-                "previous_attempts": [],
-                "data_quality": None,
-                "quality_reason": None,
-                "suggested_retry_params": None,
-                "alternative_queries": [],
-                "response": None,
-                "error": None
+            emitted_logs = 0
+            while not turn_task.done():
+                await asyncio.sleep(0.75)
+                if settings.AI_PRIMARY_ENGINE.strip().lower() != "hermes":
+                    continue
+                live_logs = HermesEngine._runtime_logs(log_offset)
+                for event in live_logs[emitted_logs:]:
+                    yield f"data: {json.dumps({'type': 'runtime.log', 'event': event})}\n\n"
+                emitted_logs = len(live_logs)
+                for skill_name, marker in HermesEngine._skill_usage_snapshot().items():
+                    skill_key = (skill_name, marker)
+                    if marker <= skill_baseline.get(skill_name, "") or skill_key in emitted_skills:
+                        continue
+                    emitted_skills.add(skill_key)
+                    skill_event = {
+                        "timestamp": marker,
+                        "type": "skill",
+                        "name": skill_name,
+                        "status": "completed",
+                    }
+                    yield f"data: {json.dumps({'type': 'runtime.log', 'event': skill_event})}\n\n"
+            turn = await turn_task
+            final_response = {
+                "type": "final",
+                "event": "run.completed",
+                **turn,
+                "runtime": turn.get("runtime") or (time.time() - start_time),
             }
-            
-            # Node name mapping for display
-            node_display_names = {
-                "mode_gate": "เลือกโหมดแชท",
-                "kb_guard": "ตรวจสอบโหมดเอกสาร",
-                "router": "วิเคราะห์ Intent",
-                "db_query": "ดึงข้อมูลจาก Database",
-                "rag_query": "ค้นหาเอกสาร",
-                "result_grader": "ตรวจสอบคุณภาพข้อมูล",
-                "rpc_planner": "ปรับ Parameters",
-                "generate_response": "สร้างคำตอบ",
-                "clarify": "ถามซ้ำ"
-            }
-            
-            final_state = None
-            
-            # Stream workflow execution
-            async for event in process_message_stream(initial_state):
-                node_name = event.get("node", "")
-                node_state = event.get("state", {})
-                elapsed = time.time() - start_time
-                
-                # Build step info
-                step_info = {
-                    "node": node_name,
-                    "display_name": node_display_names.get(node_name, node_name),
-                    "status": "processing",
-                    "elapsed_time": elapsed,
-                    "timestamp": event.get("timestamp", time.time())
-                }
-                
-                # Extract preview based on node
-                if node_name == "mode_gate":
-                    mode = node_state.get("chat_mode", "crm")
-                    step_info["preview"] = f"โหมด: {'CRM' if mode == 'crm' else 'เอกสารบริษัท'}"
-                    step_info["status"] = "completed"
-
-                elif node_name == "kb_guard":
-                    if node_state.get("intent") == "kb_blocked":
-                        step_info["preview"] = "คำถาม CRM — ให้สลับโหมด"
-                    else:
-                        step_info["preview"] = "เข้าสู่การค้นหาเอกสาร"
-                    step_info["status"] = "completed"
-
-                elif node_name == "router":
-                    intent = node_state.get("intent", "unknown")
-                    step_info["preview"] = f"Intent: {intent}"
-                    step_info["status"] = "completed"
-                
-                elif node_name == "db_query":
-                    tool_results = node_state.get("tool_results", [])
-                    if tool_results:
-                        first_tool = tool_results[0]
-                        tool_name = first_tool.get("tool", "")
-                        output = first_tool.get("output", {})
-                        
-                        if tool_name == "search_leads":
-                            if isinstance(output, dict) and "data" in output:
-                                data = output.get("data", {})
-                                leads = data.get("leads", [])
-                                count = len(leads) if isinstance(leads, list) else 0
-                                step_info["preview"] = f"พบ {count} leads" if count > 0 else "ไม่พบข้อมูล"
-                            else:
-                                step_info["preview"] = "กำลังดึงข้อมูล..."
-                        else:
-                            step_info["preview"] = f"เรียกใช้ {tool_name}"
-                    else:
-                        step_info["preview"] = "กำลังประมวลผล..."
-                    step_info["status"] = "completed"
-                    step_info["tool_results"] = tool_results
-                
-                elif node_name == "result_grader":
-                    data_quality = node_state.get("data_quality", "unknown")
-                    quality_display = {
-                        "sufficient": "ข้อมูลเพียงพอ",
-                        "insufficient": "ข้อมูลไม่เพียงพอ",
-                        "empty": "ไม่พบข้อมูล",
-                        "error": "เกิดข้อผิดพลาด"
-                    }.get(data_quality, "ตรวจสอบข้อมูล")
-                    step_info["preview"] = quality_display
-                    step_info["status"] = "completed"
-                
-                elif node_name == "rpc_planner":
-                    retry_count = node_state.get("retry_count", 0)
-                    step_info["preview"] = f"Retry #{retry_count}: ปรับ parameters"
-                    step_info["status"] = "completed"
-                
-                elif node_name == "generate_response":
-                    response = node_state.get("response", "")
-                    step_info["preview"] = "สร้างคำตอบสำเร็จ" if response else "กำลังสร้างคำตอบ..."
-                    step_info["status"] = "completed" if response else "processing"
-                
-                elif node_name == "rag_query":
-                    rag_results = node_state.get("rag_results", [])
-                    rag_meta = node_state.get("rag_retrieval_meta") or {}
-                    count = len(rag_results) if isinstance(rag_results, list) else 0
-                    ms = rag_meta.get("retrieval_ms")
-                    step_info["preview"] = (
-                        f"พบ {count} เอกสาร ({ms}ms)" if count > 0 and ms else
-                        (f"พบ {count} เอกสาร" if count > 0 else "ไม่พบเอกสาร")
-                    )
-                    step_info["data"] = rag_meta
-                    step_info["status"] = "completed"
-                
-                # Send SSE event
-                yield f"data: {json.dumps(step_info)}\n\n"
-                
-                final_state = node_state
-            
-            # Send final response
-            if final_state:
-                runtime = time.time() - start_time
-                final_response = {
-                    "type": "final",
-                    "response": final_state.get("response", ""),
-                    "session_id": session_id,
-                    "chat_mode": final_state.get("chat_mode", resolved_mode),
-                    "citations": final_state.get("citations"),
-                    "tool_calls": final_state.get("tool_calls"),
-                    "tool_results": final_state.get("tool_results", []),  # NEW: Include tool_results
-                    "intent": final_state.get("intent"),
-                    "runtime": runtime,
-                    "debug_precompute": final_state.get("debug_precompute"),
-                    "rag_retrieval_meta": final_state.get("rag_retrieval_meta"),
-                }
-                yield f"data: {json.dumps(final_response)}\n\n"
-                
-                # Save messages to database (using new chat_history service)
-                await save_message(
-                    session_id=session_id,
-                    role="user",
-                    content=request.message,
-                    metadata={"source": "web", "chat_mode": resolved_mode},
-                )
-                await save_message(
-                    session_id=session_id,
-                    role="assistant",
-                    content=final_state.get("response", ""),
-                    metadata={
-                        "source": "web",
-                        "chat_mode": final_state.get("chat_mode", resolved_mode),
-                        "intent": final_state.get("intent"),
-                        "citations": final_state.get("citations", []),
-                        "tool_calls": final_state.get("tool_calls", []),
-                        "rag": final_state.get("rag_retrieval_meta"),
-                    },
-                )
-                from app.services.active_session import touch_session
-                await touch_session(session_id)
+            yield f"data: {json.dumps(final_response)}\n\n"
         
         except Exception as e:
             logger.error(f"Streaming chat error: {e}")
             error_response = {
                 "type": "error",
-                "error": str(e)
+                "error": "ไม่สามารถประมวลผลคำขอได้ กรุณาลองใหม่อีกครั้ง",
+                "error_class": type(e).__name__,
             }
             yield f"data: {json.dumps(error_response)}\n\n"
     
@@ -430,6 +298,7 @@ async def get_chat_history(
     try:
         user_id = current_user.get("id")
         logger.info(f"Loading chat history for session {session_id} (user: {user_id})")
+        await assert_session_owner(user_id, session_id)
         
         # Load messages from database
         messages = await load_chat_history(session_id, limit=limit, exclude_current=False)
@@ -454,6 +323,8 @@ async def get_chat_history(
             "count": len(formatted_messages)
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error loading chat history: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

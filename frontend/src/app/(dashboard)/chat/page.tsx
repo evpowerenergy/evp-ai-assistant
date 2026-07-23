@@ -35,7 +35,7 @@ export default function ChatPage() {
             className="hidden max-w-[220px] truncate rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1 font-mono text-[11px] text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900/90 dark:text-neutral-400 lg:inline-flex"
             title="Model ที่ใช้สร้างคำตอบ"
           >
-            {modelConfig?.openai_model ?? '…'}
+            {modelConfig?.primary_model ?? '…'}
           </span>
           <UserProfile />
         </div>

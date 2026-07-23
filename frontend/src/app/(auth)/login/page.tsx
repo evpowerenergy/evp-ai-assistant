@@ -118,8 +118,11 @@ export default function LoginPage() {
           const b = networkNodes[to]
           const deltaX = b.x - a.x
           const deltaY = b.y - a.y
-          const length = Math.sqrt(deltaX ** 2 + deltaY ** 2)
-          const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI)
+          // Normalize computed values before SSR. Node and browsers can
+          // otherwise serialize the final floating-point digit differently,
+          // which makes React report a hydration style mismatch.
+          const length = Math.sqrt(deltaX ** 2 + deltaY ** 2).toFixed(6)
+          const angle = (Math.atan2(deltaY, deltaX) * (180 / Math.PI)).toFixed(6)
 
           return (
             <div

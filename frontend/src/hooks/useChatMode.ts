@@ -69,7 +69,9 @@ export function useChatMode() {
     [session?.access_token]
   )
 
-  const modeLabel = mode === 'crm' ? 'CRM' : 'เอกสารบริษัท'
+  // CRM/KB remains an internal LangGraph fallback preference. The only
+  // user-facing routing mode is Hermes Auto.
+  const modeLabel = 'Hermes Auto'
 
   return { mode, setMode, modeLabel, loading }
 }

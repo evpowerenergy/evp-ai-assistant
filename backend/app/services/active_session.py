@@ -8,8 +8,25 @@ from uuid import uuid4
 
 from app.services.supabase import get_supabase_client
 from app.utils.logger import get_logger
+from app.utils.exceptions import PermissionDeniedError
 
 logger = get_logger(__name__)
+
+
+async def assert_session_owner(user_id: str, session_id: str) -> None:
+    """Fail closed because the service-role client bypasses database RLS."""
+    supabase = get_supabase_client()
+    result = (
+        supabase.table("chat_sessions")
+        .select("id")
+        .eq("id", session_id)
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not result.data:
+        logger.warning("Session ownership denied user=%s session=%s", user_id, session_id)
+        raise PermissionDeniedError("You do not have access to this chat session")
 
 
 def _title_from_message(message: str) -> str:
@@ -28,6 +45,7 @@ async def touch_session(session_id: str) -> None:
 
 
 async def set_active_session(user_id: str, session_id: str) -> None:
+    await assert_session_owner(user_id, session_id)
     supabase = get_supabase_client()
     existing = (
         supabase.table("user_chat_preferences")

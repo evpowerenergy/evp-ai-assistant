@@ -52,6 +52,14 @@ export default function AdminPage() {
         </Link>
 
         <Link
+          href="/admin/agent-runs"
+          className="rounded-lg border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
+        >
+          <h2 className="text-lg font-semibold text-foreground">Agent Runtime Audit</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Inspect Hermes runs, skills, tools, timeouts and fallback timelines</p>
+        </Link>
+
+        <Link
           href="/admin/logs"
           className="rounded-lg border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
         >

@@ -209,11 +209,16 @@ export function LoginThreeBackground({ mode }: LoginThreeBackgroundProps) {
     }
     window.addEventListener('mousemove', onMouseMove)
 
-    const clock = new THREE.Clock()
+    const timer = new THREE.Timer()
+    timer.connect(document)
     let rafId = 0
 
     const animate = () => {
-      const elapsed = clock.getElapsedTime()
+      // Let Timer use performance.now(). Mixing an immediate first call with
+      // requestAnimationFrame timestamps can briefly produce negative elapsed
+      // time in some browsers, which sends CatmullRomCurve3 a negative index.
+      timer.update()
+      const elapsed = timer.getElapsed()
       const pos = particleGeometry.getAttribute('position') as THREE.BufferAttribute
 
       for (let i = 0; i < particleCount; i += 1) {
@@ -236,8 +241,9 @@ export function LoginThreeBackground({ mode }: LoginThreeBackgroundProps) {
       logoPlane.material.opacity = 0.45 + Math.abs(Math.sin(elapsed * 1.5)) * 0.28
       logoPlane.position.y = 2.1 + Math.sin(elapsed * 1.2) * 0.14
 
-      const tA = (elapsed * 0.26) % 1
-      const tB = ((elapsed * 0.26) + 0.42) % 1
+      const normalizedProgress = ((elapsed * 0.26) % 1 + 1) % 1
+      const tA = normalizedProgress
+      const tB = (normalizedProgress + 0.42) % 1
       pulseA.position.copy(cableCurve.getPointAt(tA))
       pulseB.position.copy(cableCurve.getPointAt(tB))
       pulseA.scale.setScalar(1 + Math.abs(Math.sin(elapsed * 4)) * 0.5)
@@ -262,6 +268,7 @@ export function LoginThreeBackground({ mode }: LoginThreeBackgroundProps) {
 
     return () => {
       window.cancelAnimationFrame(rafId)
+      timer.dispose()
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('resize', onResize)
       particleGeometry.dispose()

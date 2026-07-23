@@ -28,6 +28,25 @@ interface ProcessStep {
   data?: any
 }
 
+export interface AgentRuntimeInfo {
+  engine: string
+  model?: string
+  fallbackUsed: boolean
+  requestId?: string
+  logs?: RuntimeLogEvent[]
+}
+
+export interface RuntimeLogEvent {
+  timestamp?: string
+  type: 'tool' | 'skill' | 'summary'
+  name: string
+  status: 'completed' | 'error'
+  duration?: number | null
+  model?: string
+  api_calls?: string
+  tool_turns?: number
+}
+
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
@@ -36,6 +55,7 @@ export function useChat() {
   const [runtime, setRuntime] = useState<number | undefined>(undefined)
   const [toolResults, setToolResults] = useState<any[]>([])
   const [debugPrecompute, setDebugPrecompute] = useState<Record<string, any> | null>(null)
+  const [agentRuntime, setAgentRuntime] = useState<AgentRuntimeInfo | null>(null)
   const [useStreaming, setUseStreaming] = useState(true)  // Enable streaming by default
   const { session } = useAuth()
 
@@ -54,6 +74,7 @@ export function useChat() {
       setRuntime(undefined)
       setToolResults([])
       setDebugPrecompute(null)
+      setAgentRuntime({ engine: 'hermes', model: 'gpt-5.6-luna', fallbackUsed: false, logs: [] })
 
       // Add user message immediately (only if not already in history)
       // Check if this message is already in the messages list (from history)
@@ -135,6 +156,13 @@ export function useChat() {
           if (response.data.debug_precompute) {
             setDebugPrecompute(response.data.debug_precompute)
           }
+          setAgentRuntime({
+            engine: response.data.engine || 'unknown',
+            model: response.data.model,
+            fallbackUsed: Boolean(response.data.fallback_used),
+            requestId: response.data.request_id,
+            logs: response.data.runtime_logs || [],
+          })
         }
       } catch (err: any) {
         setError(err.response?.data?.detail || err.message || 'Failed to send message')
@@ -192,7 +220,23 @@ export function useChat() {
           try {
             const data = JSON.parse(line.slice(6))
             
-            if (data.type === 'final') {
+            if (data.type === 'runtime.log' && data.event) {
+              const event = data.event as RuntimeLogEvent
+              setAgentRuntime((previous) => {
+                const current = previous || {
+                  engine: 'hermes',
+                  model: 'gpt-5.6-luna',
+                  fallbackUsed: false,
+                  logs: [],
+                }
+                const logs = current.logs || []
+                const key = `${event.timestamp || ''}:${event.type}:${event.name}`
+                const exists = logs.some(
+                  (item) => `${item.timestamp || ''}:${item.type}:${item.name}` === key
+                )
+                return exists ? current : { ...current, logs: [...logs, event] }
+              })
+            } else if (data.type === 'final') {
               // Final response
               const assistantMessage: Message = {
                 id: `assistant-${Date.now()}`,
@@ -226,6 +270,22 @@ export function useChat() {
               if (data.debug_precompute) {
                 setDebugPrecompute(data.debug_precompute)
               }
+              setAgentRuntime((previous) => {
+                const mergedLogs = [...(previous?.logs || []), ...(data.runtime_logs || [])]
+                  .filter((event, index, items) => {
+                    const key = `${event.timestamp || ''}:${event.type}:${event.name}`
+                    return items.findIndex(
+                      (item) => `${item.timestamp || ''}:${item.type}:${item.name}` === key
+                    ) === index
+                  })
+                return {
+                  engine: data.engine || 'unknown',
+                  model: data.model,
+                  fallbackUsed: Boolean(data.fallback_used),
+                  requestId: data.request_id,
+                  logs: mergedLogs,
+                }
+              })
             } else if (data.type === 'error') {
               setError(data.error || 'Unknown error')
             } else {
@@ -330,6 +390,7 @@ export function useChat() {
     setRuntime(undefined)
     setToolResults([])
     setDebugPrecompute(null)
+    setAgentRuntime(null)
   }, [])
 
   return {
@@ -343,5 +404,6 @@ export function useChat() {
     runtime,
     toolResults,
     debugPrecompute,
+    agentRuntime,
   }
 }

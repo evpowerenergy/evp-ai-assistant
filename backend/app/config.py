@@ -2,7 +2,7 @@
 Application Configuration
 """
 from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore[reportMissingImports]
-from typing import List
+from typing import List, Optional
 from pydantic import field_validator
 import json
 import os
@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     # Supabase
     SUPABASE_URL: str
     SUPABASE_SERVICE_ROLE_KEY: str
+    SUPABASE_JWT_SECRET: Optional[str] = None
+    SUPABASE_JWT_JWKS_URL: Optional[str] = None
+    SUPABASE_JWT_AUDIENCE: str = "authenticated"
     
     # OpenAI
     OPENAI_API_KEY: str
@@ -34,6 +37,26 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
     API_PORT: int = 8000
+
+    # Agent runtime (LangGraph remains the safe default during rollout).
+    AI_PRIMARY_ENGINE: str = "langgraph"
+    AI_FALLBACK_ENGINE: str = "langgraph"
+    AI_FALLBACK_ENABLED: bool = True
+    AI_SHADOW_ENGINE: str = ""
+    HERMES_BASE_URL: str = "http://127.0.0.1:8642"
+    HERMES_API_KEY: str = ""
+    HERMES_MODEL: str = "gpt-5.6-luna"
+    HERMES_CONNECT_TIMEOUT_SECONDS: float = 3.0
+    # Browser/research turns routinely need more than 90 seconds. This timeout
+    # must exceed Hermes' normal research duration or the gateway will start a
+    # fallback while Hermes is still working on the same request.
+    HERMES_TURN_TIMEOUT_SECONDS: float = 900.0
+    # Optional local/shared-volume log used only for sanitized debug traces.
+    HERMES_LOG_PATH: str = ""
+    EVP_EXECUTION_PRIVATE_KEY: str = ""
+    EVP_EXECUTION_PUBLIC_KEY: str = ""
+    EVP_EXECUTION_KEY_ID: str = "evp-runtime-1"
+    EVP_EXECUTION_TOKEN_TTL_SECONDS: int = 900
 
     # Who may use authenticated AI Assistant APIs (comma-separated; case-insensitive match)
     AI_ASSISTANT_ALLOWED_ROLES: str = "super_admin,manager_sale,manager_marketing,manager_hr"
@@ -112,6 +135,12 @@ class Settings(BaseSettings):
         if not raw:
             return ["super_admin", "manager_sale", "manager_marketing", "manager_hr"]
         return [x.strip() for x in raw.split(",") if x.strip()]
+
+    @property
+    def supabase_jwt_jwks_url(self) -> str:
+        if self.SUPABASE_JWT_JWKS_URL:
+            return self.SUPABASE_JWT_JWKS_URL.rstrip("/")
+        return f"{self.SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
     
     model_config = SettingsConfigDict(
         env_file=".env",

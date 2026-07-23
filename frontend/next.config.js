@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Verification builds may use .next-build so they never overwrite the
+  // active development server's .next chunks.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   output: 'standalone', // For Cloud Run deployment
   reactStrictMode: true,
   swcMinify: true,

@@ -2,10 +2,11 @@
 Authentication and Authorization
 """
 from typing import Optional
-import time
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
+import httpx
+from jwt import PyJWKClient
 from app.utils.exceptions import AuthenticationError, PermissionDeniedError
 from app.utils.logger import get_logger
 from app.config import settings
@@ -13,29 +14,90 @@ from app.core.roles import is_ai_assistant_role, resolve_role_from_db
 
 logger = get_logger(__name__)
 security = HTTPBearer()
+_jwks_client: Optional[PyJWKClient] = None
+
+
+async def _verify_with_supabase_auth(token: str) -> dict:
+    """Validate a legacy HS256 access token with the issuing Auth service.
+
+    New Supabase projects expose asymmetric JWKS. Legacy projects do not, and
+    local developers may not have the project's JWT secret. Calling /auth/v1/user
+    still performs authoritative server-side token validation without weakening
+    signature checks or trusting unverified claims locally.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/user",
+                headers={
+                    "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+                    "Authorization": f"Bearer {token}",
+                },
+            )
+        if response.status_code != 200:
+            raise AuthenticationError("Invalid token")
+        user = response.json()
+    except AuthenticationError:
+        raise
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.error("Supabase Auth token verification failed: %s", type(exc).__name__)
+        raise AuthenticationError("Token verification failed") from exc
+
+    user_id = user.get("id")
+    if not user_id:
+        raise AuthenticationError("User ID not found in token")
+    return {
+        "sub": user_id,
+        "email": user.get("email", ""),
+        "user_metadata": user.get("user_metadata") or {},
+        "aud": user.get("aud", settings.SUPABASE_JWT_AUDIENCE),
+    }
+
+
+def _get_jwks_client() -> PyJWKClient:
+    global _jwks_client
+    if _jwks_client is None:
+        _jwks_client = PyJWKClient(
+            settings.supabase_jwt_jwks_url,
+            cache_keys=True,
+            lifespan=300,
+        )
+    return _jwks_client
 
 
 async def verify_jwt_token(token: str) -> dict:
     """
     Verify JWT token from Supabase
     Returns decoded token payload
-    Since JWKS endpoint is not available, we decode without signature verification
-    and verify user exists in database instead
+    Signature verification is mandatory. Asymmetric tokens use Supabase JWKS;
+    legacy HS256 tokens require SUPABASE_JWT_SECRET.
     """
     try:
-        # Decode token without signature verification
-        # We'll verify user exists in database separately
-        unverified = jwt.decode(token, options={"verify_signature": False})
+        header = jwt.get_unverified_header(token)
+        algorithm = str(header.get("alg") or "")
+        if algorithm == "HS256":
+            if not settings.SUPABASE_JWT_SECRET:
+                logger.info("Verifying legacy HS256 token with Supabase Auth")
+                return await _verify_with_supabase_auth(token)
+            signing_key = settings.SUPABASE_JWT_SECRET
+        elif algorithm in {"RS256", "ES256"}:
+            signing_key = _get_jwks_client().get_signing_key_from_jwt(token).key
+        else:
+            raise AuthenticationError("Unsupported JWT algorithm")
+
+        unverified = jwt.decode(
+            token,
+            signing_key,
+            algorithms=[algorithm],
+            audience=settings.SUPABASE_JWT_AUDIENCE,
+            options={"require": ["exp", "sub"]},
+        )
         
         user_id = unverified.get("sub")
         if not user_id:
             raise AuthenticationError("User ID not found in token")
         
-        # Check token expiration manually
         exp = unverified.get("exp")
-        if exp and time.time() >= exp:
-            logger.warning("JWT token expired")
-            raise AuthenticationError("Token expired")
         
         # Note: auth.users table cannot be queried via REST API
         # We rely on JWT token payload which already contains user info from Supabase Auth

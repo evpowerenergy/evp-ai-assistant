@@ -13,6 +13,10 @@ export interface ConfigInfo {
   openai_model: string
   agents: AgentInfo[]
   agents_count: number
+  primary_engine: string
+  primary_model: string
+  fallback_engine: string
+  fallback_model: string
 }
 
 /** ดึง config (model, agents) — ไม่ต้อง login เพราะ GET /config ไม่ต้อง auth */

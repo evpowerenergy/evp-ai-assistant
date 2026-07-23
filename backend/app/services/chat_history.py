@@ -39,10 +39,12 @@ async def load_chat_history(
     try:
         supabase = get_supabase_client()
         
+        # Fetch the newest N rows, then restore chronological order. The old
+        # ascending+limit query returned the oldest messages in long sessions.
         query = supabase.table("chat_messages")\
             .select("*")\
             .eq("session_id", session_id)\
-            .order("created_at", desc=False)  # Oldest first
+            .order("created_at", desc=True)
         
         if exclude_current:
             # Get count first
@@ -59,15 +61,16 @@ async def load_chat_history(
                 result = query.execute()
                 
                 if result.data and len(result.data) > 1:
-                    # Remove the last one (most recent)
-                    return result.data[:-1]
+                    # Query is newest-first: remove index 0, then restore
+                    # chronological order for the LLM.
+                    return list(reversed(result.data[1:]))
                 return []
         
         result = query.limit(limit).execute()
         
         if result.data:
             logger.info(f"Loaded {len(result.data)} messages from session {session_id}")
-            return result.data
+            return list(reversed(result.data))
         else:
             logger.info(f"No messages found for session {session_id}")
             return []
